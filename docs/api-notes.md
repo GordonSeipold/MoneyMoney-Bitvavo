@@ -22,6 +22,7 @@ Headers on every private request:
 | `bitvavo-access-timestamp` | milliseconds since epoch, as a string |
 | `bitvavo-access-window` | milliseconds of tolerance; SDK default `10000` |
 | `content-type` | `application/json` |
+| `accept` | `application/json` – required, see *Error responses* |
 
 Signature string, concatenated with **no delimiter**:
 
@@ -59,11 +60,32 @@ Failures come back as JSON with a numeric `errorCode`:
 { "errorCode": 301, "error": "API Key must be of length 64." }
 ```
 
-**Authentication failures use HTTP 403, not 401.** A malformed or unknown key returns 403
-(`errorCode` 301 for a wrong-length key). This matters for an extension: 403 cannot be read as
-"credentials fine, permission missing", because a plain typo produces the same status. Since
-MoneyMoney discards the response body along with the failed request, a 403 message has to name
-every possible cause – wrong key or secret, missing `View access`, IP not whitelisted.
+**Authentication failures use HTTP 403, not 401**, and the status alone is useless: a typo, a
+missing permission and a blocked IP all produce 403. The `errorCode` in the body is what
+distinguishes them.
+
+| Code | Meaning |
+|---|---|
+| 105 | rate limit exceeded (HTTP 429) |
+| 300 | endpoint requires authentication |
+| 301 | API key has an invalid length |
+| 302 | timestamp is not in milliseconds |
+| 303 | `Bitvavo-Access-Window` out of range |
+| 304 | request did not arrive within the access window |
+| 305 | API key is not active |
+| 306 | API key activation not confirmed |
+| 307 | IP is not in the whitelist for this key |
+| 308 | signature format is invalid |
+| 309 | signature is invalid |
+| 311 | key lacks the `View access` permission |
+
+Source: <https://docs.bitvavo.com/docs/errors/>.
+
+**Reading that body from MoneyMoney requires `Accept: application/json` on the request.** Without
+it the engine terminates the script on a non-2xx status and shows its own generic error message
+instead of anything the extension returns; with it, the response is handed back to the script.
+Documented at <https://moneymoney.app/api/webbanking/> under `connection:request`. It is easy to
+miss, and missing it makes every failure look indistinguishable from the outside.
 
 ## Rate limits **[verified – live response headers]**
 
@@ -73,9 +95,10 @@ bitvavo-ratelimit-remaining: 999
 bitvavo-ratelimit-resetat: 1786898340000   (ms epoch)
 ```
 
-1000 weight per minute. A simple call costs 1; `/assets` (full list) cost ~4. Error code `105`
-signals the limit was exceeded. Irrelevant in practice for an extension that makes three
-requests per refresh, but the headers are worth reading for a clear error message.
+1000 weight per minute, and the cost differs sharply per endpoint **[verified – official docs]**:
+`/balance` and `/stakingBalance` cost **5** each, `/ticker/price` and `/assets` cost **1**. Error
+code `105` signals the limit was exceeded. Irrelevant in practice at two calls per refresh, but
+worth knowing which call is the expensive one – it is the balance, not the full asset list.
 
 ## Endpoints needed
 
@@ -91,8 +114,10 @@ fields per entry, exactly as both SDKs document.
 - Total holding = `available + inOrder`. Both are **strings**, including a plain `"0"`.
 - Fiat appears here like any other asset, with `symbol: "EUR"`.
 - Only assets with a balance are returned; zero balances are omitted.
-- Still open: whether **staked / earning** balances appear. The account used for verification
-  held no crypto, so this is untested rather than answered.
+- **Fixed-staking positions are not included.** Bitvavo states it plainly: this endpoint returns
+  the balance available for trading, and assets locked in fixed staking are reported separately
+  by `GET /stakingBalance`. A portfolio that stakes is therefore understated by this endpoint
+  alone.
 
 ### `GET /v2/ticker/price` – public **[verified – live]**
 
@@ -128,7 +153,7 @@ crypto extensions that source prices externally.
 {"symbol":"EUR","name":"Euro","decimals":2,"networks":["SEPA"],...}
 ```
 
-One call gives a `symbol → name` map, so securities can show "Bitcoin" rather than "BTC".
+One call gives a `symbol → name` map, so a position can show "Bitcoin" rather than "BTC".
 EUR is itself an asset here.
 
 **475 assets but only 440 markets. 45 assets have no price route to EUR at all**
@@ -142,6 +167,17 @@ possible. **This is the case the unpriced code path exists for.** At roughly one
 is a normal occurrence rather than an exotic edge case, which is what makes returning no price
 the right behaviour: a zero would silently understate the portfolio. The list is a snapshot and
 will drift as Bitvavo lists and delists; nothing in the code depends on it.
+
+### `GET /v2/stakingBalance` – private, not used **[verified – official docs]**
+
+Weight 5. Returns `[{ "symbol": ..., "amount": ... }]` for assets in fixed staking, which the
+balance endpoint deliberately excludes: *"This request only returns assets locked in fixed
+staking. To get your balance available for trading, use the Get account balance request."*
+
+Not called by this extension. Adding it is a small change, but it alters the portfolio total and
+raises a question the API cannot answer: whether a staked amount should be merged into the
+asset's position or shown separately, given that it cannot be traded. Deciding that needs an
+account that actually stakes.
 
 ### Possible later additions **[unconfirmed]**
 
@@ -188,20 +224,25 @@ leaving the withdrawal right disabled a real security measure rather than mere t
 
 | Call | Weight | Frequency | Purpose |
 |---|---|---|---|
-| `GET /v2/balance` | 1 | every refresh | holdings |
+| `GET /v2/balance` | 5 | every refresh | holdings |
 | `GET /v2/ticker/price` | 1 | every refresh | all prices in one call |
-| `GET /v2/assets` | ~4 | once a week | symbol → display name, cached in `LocalStorage` |
+| `GET /v2/assets` | 1 | once a week | symbol → display name, cached in `LocalStorage` |
 
-**Two requests on a normal refresh**, three when the cached display names expire, against a
-budget of 1000 weight per minute. Display names change rarely, which is what makes the weekly
-TTL worth the small amount of state it costs.
+**Two requests and 6 weight on a normal refresh**, three and 7 when the cached display names
+expire, against a budget of 1000 per minute.
+
+Note that `InitializeSession2` runs on every refresh cycle, not only when the account is added.
+Fetching `/balance` there *and* in `RefreshAccount` would double the most expensive call in the
+set, so the login check hands its response to the first refresh instead.
 
 ## Still to be verified
 
-One point needs an account holding crypto, and is not a settled fact:
+Everything here has been checked against the live API or the official documentation, with two
+exceptions that need an account holding crypto:
 
-- Whether **staked / earning** balances appear in `/v2/balance` at all. Bitvavo offers staking,
-  and the SDK surface shows no dedicated endpoint for it. If they are absent, a portfolio is
-  understated with no visible sign – the most consequential open question here.
+- How MoneyMoney renders a position whose `price` is `nil`. The expectation is quantity without
+  a value; that has not been seen on screen.
+- Whether a staked amount is better merged into the asset's position or listed separately, once
+  `GET /v2/stakingBalance` is used at all.
 
-Anyone able to settle either point against an account holding crypto is welcome to open an issue.
+Anyone able to settle either point is welcome to open an issue.

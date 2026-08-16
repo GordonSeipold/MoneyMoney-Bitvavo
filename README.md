@@ -19,14 +19,14 @@ Diese Web Banking Extension für [MoneyMoney](https://moneymoney.app) ruft Ihre 
 
 - **Nur aktuelle Bestände.** Ein- und Auszahlungen sowie Trades werden nicht importiert.
 - **Fest gestakte Bestände sind nicht enthalten.** Bitvavo meldet sie über einen eigenen Endpunkt, den diese Version nicht abfragt. Wenn Sie staken, zeigt MoneyMoney entsprechend weniger an als die Bitvavo-App.
-- **Rund 45 der 475 Bitvavo-Assets sind vom Handel ausgeschlossen und haben keinen Kurs.** Sie können solche Assets weiterhin halten. In diesem Fall werden sie mit ihrer Stückzahl, aber ohne Wert angezeigt – statt mit einem erfundenen Kurs. Das Protokollfenster benennt jedes betroffene Asset, sodass eine Position nie unbemerkt verschwindet.
+- **Einige Assets sind bei Bitvavo vom Handel ausgeschlossen und haben keinen Kurs.** Solche Bestände werden mit ihrer Stückzahl, aber ohne Wert angezeigt – statt mit einem erfundenen Kurs. Das Protokollfenster nennt jedes betroffene Asset, sodass eine Position nie unbemerkt verschwindet. Welche Kryptowährungen handelbar sind, zeigt die [Marktübersicht von Bitvavo](https://bitvavo.com/de/markets).
 
 ---
 
 ## Voraussetzungen
 
-- **Getestet mit MoneyMoney 2.5.1 unter macOS 26.5.2.** Ältere Versionen sind ungetestet, nicht bekanntermaßen inkompatibel. Falls es bei Ihnen unter einer älteren Version funktioniert, freue ich mich über einen entsprechenden Hinweis per Issue.
-- Ein Bitvavo-Konto mit einem API-Schlüssel, der **ausschließlich Leserechte** besitzt
+- Getestet mit MoneyMoney 2.5.1 unter macOS 26.5.2
+- Ein [Bitvavo-Konto](https://bitvavo.com/de) mit einem API-Schlüssel, der **ausschließlich Leserechte** besitzt
 
 ---
 
@@ -74,31 +74,11 @@ Beim ersten Verbindungsaufbau fragt MoneyMoney nach der Bestätigung des SSL-Zer
 
 ---
 
-## Wenn die Einrichtung fehlschlägt
-
-MoneyMoney meldet jede abgelehnte Anfrage als *"Der Server Ihrer Bank meldet einen internen Fehler. Bitte versuchen Sie es später noch einmal."* – unabhängig von der tatsächlichen Ursache. Die Extension kann diesen Text nicht ersetzen: MoneyMoney bricht das Skript innerhalb der Anfrage ab.
-
-Unterscheiden lassen sich die Fälle im Protokollfenster (*Fenster → Protokoll*). Die Extension schreibt dort bei jeder Anmeldung eine Zeile mit den Längen beider Felder – nur die Längen, nie die Werte selbst:
-
-```
-Bitvavo: credentials received, 64 and 5 characters (the key should be 64).
-```
-
-Folgt darauf `Bitvavo: login check succeeded.`, waren die Zugangsdaten in Ordnung und die Ursache liegt nicht bei ihnen. Andernfalls arbeiten Sie diese Liste von oben nach unten ab:
-
-1. **Schlüssel und Secret vertauscht oder unvollständig eingefügt.** Die erste Zahl der Protokollzeile ist die Länge des Feldes Benutzername und muss 64 sein. Weicht sie ab, zeigt MoneyMoney statt der allgemeinen Meldung einen eindeutigen Hinweis der Extension – dann gehört der Schlüssel ins Feld Benutzername und das Secret ins Feld Kennwort. Steht dort 64, ist diese Ursache ausgeschlossen. Führende und abschließende Leerzeichen entfernt die Extension selbst; ein mitkopiertes Leerzeichen kommt als Ursache nicht in Frage.
-2. **IP-Whitelist passt nicht mehr.** Bei Bitvavo in den Konto-Einstellungen, Bereich **API**: Ist beim Schlüssel eine IP-Adresse hinterlegt, muss sie Ihrer aktuellen öffentlichen Adresse entsprechen. Eine leere Whitelist schließt die Ursache aus. Das ist der häufigste Grund dafür, dass eine gestern funktionierende Einrichtung heute fehlschlägt: Der Anschluss hat eine neue Adresse erhalten.
-3. **`View access` ist nicht aktiviert.** Gleiche Ansicht: Fehlt dem Schlüssel dieses Recht, beantwortet Bitvavo jede Anfrage mit HTTP 403 und Sie sehen die allgemeine Meldung. Ist es gesetzt, ist die Ursache ausgeschlossen.
-4. **Schlüssel widerrufen oder abgelaufen.** Gleiche Ansicht: Erscheint der Schlüssel dort nicht mehr oder ist er als abgelaufen markiert, ist das die Ursache.
-5. **Falsches Secret.** Bleibt übrig, wenn 1 bis 4 ausgeschlossen sind. Das Secret wird nicht auf Länge geprüft und ist nach dem Anlegen nicht mehr einsehbar, ein Tippfehler oder eine abgeschnittene Kopie fällt daher nirgends auf. Legen Sie einen neuen Schlüssel an und tragen Sie beide Werte erneut ein.
-
----
-
 ## Sicherheit
 
-- Nur lesender Zugriff: Die Extension stellt ausschließlich Leseanfragen. Sie erteilt niemals eine Order, bewegt keine Bestände und ändert keine Einstellung.
-- API-Schlüssel und Secret verbleiben in der verschlüsselten Datenbank von MoneyMoney. Sie werden ausschließlich an Bitvavo übertragen, und zwar in Request-Headern, niemals in einer URL.
-- Es werden keine Daten protokolliert oder an Dritte übermittelt. Zwischengespeichert wird allein die öffentliche Liste der Asset-Namen.
+- **Nur lesender Zugriff.** Die Extension stellt ausschließlich Leseanfragen. Sie erteilt niemals eine Order, bewegt keine Bestände und ändert keine Einstellung.
+- **Das Secret verlässt Ihren Mac nicht.** Es dient nur zum Signieren der Anfragen. Übertragen wird allein der API-Schlüssel, in Request-Headern, niemals in einer URL. Beide bleiben in der verschlüsselten Datenbank von MoneyMoney.
+- **Nichts geht an Dritte.** Die Extension spricht ausschließlich mit `api.bitvavo.com`. In MoneyMoneys Protokollfenster schreibt sie die Länge der eingegebenen Felder – nie deren Inhalt – sowie die Namen von Assets ohne Kurs. Das bleibt auf Ihrem Rechner.
 
 ---
 
