@@ -7,6 +7,8 @@ Unofficial [MoneyMoney](https://moneymoney.app) extension that fetches your bala
 
 > Not affiliated with or endorsed by Bitvavo or MoneyMoney.
 
+---
+
 ## What it does
 
 - Lists every asset you hold as a position, using the asset's full name ("Bitcoin", not "BTC")
@@ -26,11 +28,15 @@ Unofficial [MoneyMoney](https://moneymoney.app) extension that fetches your bala
   at a made-up price. The protocol window names any asset this affects, so a position never
   disappears silently.
 
+---
+
 ## Requirements
 
 - **Tested with MoneyMoney 2.5.1 on macOS 26.5.2.** Earlier versions are untested rather than
   known to be unsupported – if it works for you on an older one, please open an issue saying so.
 - A Bitvavo account with an API key that has **read permission only**
+
+---
 
 ## Setup
 
@@ -115,6 +121,8 @@ So if you see it, work through these in order:
 The protocol window (*Window → Protocol*) shows the number of characters received in each field,
 which usually settles cause 1 immediately.
 
+---
+
 ## Security
 
 - Read-only: the extension issues read requests only. It never places an order, moves funds or
@@ -123,6 +131,8 @@ which usually settles cause 1 immediately.
   Bitvavo, in request headers, never in a URL or query string.
 - Nothing is logged, cached or transmitted anywhere else. The only cached data is the public
   list of asset display names.
+
+---
 
 ## Development
 
@@ -134,10 +144,14 @@ make install   # copy into MoneyMoney's Extensions folder
 API details, including what is verified and what is not, are in
 [`docs/api-notes.md`](docs/api-notes.md).
 
-## Note on development
+---
+
+## AI assistance
 
 Parts of this extension were written or reviewed with AI assistance. All code has been reviewed
 and tested by the author before release.
+
+---
 
 ## License
 
