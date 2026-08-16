@@ -198,12 +198,10 @@ TTL worth the small amount of state it costs.
 
 ## Still to be verified
 
-These need a real API key, and are not settled facts:
+One point needs an account holding crypto, and is not a settled fact:
 
-1. The exact `/v2/balance` response shape. Implemented against the shape both official SDKs
-   document; a mismatch raises an error rather than producing wrong numbers, but it is untested.
-2. Whether **staked / earning** balances appear in `/v2/balance` at all. Bitvavo offers staking,
-   and the SDK surface shows no dedicated endpoint for it. If they are absent, a portfolio is
-   understated with no visible sign – the most consequential open question here.
+- Whether **staked / earning** balances appear in `/v2/balance` at all. Bitvavo offers staking,
+  and the SDK surface shows no dedicated endpoint for it. If they are absent, a portfolio is
+  understated with no visible sign – the most consequential open question here.
 
 Anyone able to settle either point against an account holding crypto is welcome to open an issue.
