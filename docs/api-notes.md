@@ -22,7 +22,7 @@ Headers on every private request:
 | `bitvavo-access-timestamp` | milliseconds since epoch, as a string |
 | `bitvavo-access-window` | milliseconds of tolerance; SDK default `10000` |
 | `content-type` | `application/json` |
-| `accept` | `application/json` – required, see *Error responses* |
+| `Accept` | `application/json` – required, and capitalised, see *Error responses* |
 
 Signature string, concatenated with **no delimiter**:
 
@@ -84,8 +84,12 @@ Source: <https://docs.bitvavo.com/docs/errors/>.
 **Reading that body from MoneyMoney requires `Accept: application/json` on the request.** Without
 it the engine terminates the script on a non-2xx status and shows its own generic error message
 instead of anything the extension returns; with it, the response is handed back to the script.
-Documented at <https://moneymoney.app/api/webbanking/> under `connection:request`. It is easy to
-miss, and missing it makes every failure look indistinguishable from the outside.
+Documented at <https://moneymoney.app/api/webbanking/> under `connection:request`.
+
+**Spell the key `Accept`, not `accept`.** HTTP header names are case-insensitive on the wire and
+Bitvavo answers either spelling identically, but MoneyMoney reads the header table itself to
+decide whether to return the body, and that lookup is literal. A lowercase key behaves exactly
+like no header at all.
 
 ## Rate limits **[verified – live response headers]**
 

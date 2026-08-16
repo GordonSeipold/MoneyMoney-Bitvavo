@@ -36,7 +36,7 @@ WebBanking{
   -- Pre-release. 1.0 is reserved for the first signed, published build; until then every
   -- version handed over for testing gets the next 0.x, so the protocol window says which
   -- build is actually loaded.
-  version  = 0.7,
+  version  = 0.9,
   url      = "https://bitvavo.com",
   services = { BANK_CODE },
   -- MoneyMoney gives an extension no way to rename the credential fields, so this description
@@ -81,23 +81,25 @@ end
 -- These strings are shown to the user in MoneyMoney, so they are German, like the README.
 local ERROR_ADVICE = {
   [105] = "Bitvavo hat wegen zu vieler Anfragen vorübergehend gesperrt. Warten Sie eine Minute.",
-  [300] = "Bitvavo hat die Anfrage ohne gültige Authentifizierung erhalten.",
   [301] = "Der API-Schlüssel hat nicht die erwartete Länge von 64 Zeichen. In das Feld " ..
           "Benutzername gehört der Schlüssel, in das Feld Passwort das Secret.",
-  [302] = "Bitvavo hat den Zeitstempel der Anfrage abgelehnt.",
-  [303] = "Bitvavo hat das Zeitfenster der Anfrage abgelehnt.",
   [304] = "Die Anfrage kam zu spät bei Bitvavo an. Prüfen Sie, ob die Uhr dieses Macs richtig geht.",
   [305] = "Der API-Schlüssel ist nicht aktiv - widerrufen, abgelaufen oder gelöscht.",
-  [306] = "Die Aktivierung des API-Schlüssels ist noch nicht bestätigt. Prüfen Sie Ihre E-Mails.",
   [307] = "Die IP-Adresse dieses Macs steht nicht auf der Whitelist des Schlüssels. Passen Sie " ..
           "sie bei Bitvavo unter Einstellungen, API an - oder lassen Sie das Feld leer.",
-  [308] = "Die Signatur der Anfrage hat ein ungültiges Format.",
   [309] = "Die Signatur der Anfrage ist ungültig. Meist ist das Secret falsch oder unvollständig " ..
           "im Feld Passwort eingetragen.",
   [311] = "Dem API-Schlüssel fehlt die Berechtigung \"View access\". Aktivieren Sie sie bei " ..
           "Bitvavo unter Einstellungen, API."
 }
 
+-- Bitvavo's own message is shown unless translating it adds something the user can act on.
+-- "Your signature is invalid" is the case that justifies the table at all: it is accurate and
+-- useless, because Bitvavo cannot know that the secret goes in a field MoneyMoney labels
+-- Passwort. Codes describing a fault in this extension rather than in the user's setup - a
+-- malformed timestamp, a signature of the wrong length - are deliberately absent: inventing
+-- friendly wording for a bug would only obscure it.
+--
 -- err is the table returned by tryRequest: { code = Number|nil, message = String }.
 local function describeError (err)
   local advice = err.code and ERROR_ADVICE[err.code]
@@ -150,15 +152,19 @@ local function requestPrivate (path)
     ["bitvavo-access-signature"] = bin2hex(MM.hmac256(apiSecret, message)),
     ["bitvavo-access-timestamp"] = timestamp,
     ["bitvavo-access-window"]    = ACCESS_WINDOW,
-    ["content-type"]             = "application/json",
-    ["accept"]                   = "application/json"
+    ["Content-Type"]             = "application/json",
+    -- Capitalised deliberately. On the wire HTTP header names are case-insensitive, but
+    -- MoneyMoney has to inspect this table itself to decide whether to hand a failed response
+    -- back to the script, and its documentation spells the field "Accept". A lowercase key
+    -- would be sent correctly and still miss that check.
+    ["Accept"]                   = "application/json"
   })
 end
 
 local function requestPublic (path)
   return tryRequest(path, {
-    ["content-type"] = "application/json",
-    ["accept"]       = "application/json"
+    ["Content-Type"] = "application/json",
+    ["Accept"]       = "application/json"
   })
 end
 
