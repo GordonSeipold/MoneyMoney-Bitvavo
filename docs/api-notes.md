@@ -38,7 +38,9 @@ timestamp + METHOD + "/v2" + path + [body]
 In MoneyMoney terms: `MM.hmac256` returns **binary**, so it must be hex-encoded explicitly –
 the same `bin2hex` helper the existing Binance script uses.
 
-Worked example from the official docs, useful as a unit check:
+Worked example from the official docs. **[verified]** – the concatenation order above reproduces
+this digest exactly (`openssl dgst -sha256 -hmac`), so the signed-string construction is settled
+even though a live authenticated call has not been made:
 
 ```
 secret    = "bitvavo"
@@ -48,6 +50,20 @@ path      = "/v2/order"
 body      = {"market":"BTC-EUR","side":"buy","price":"5000","amount":"1.23","orderType":"limit"}
 => 44d022723a20973a18f7ee97398b9fdd405d2d019c8d39e24b8cc0dcb39ca016
 ```
+
+## Error responses **[verified – live]**
+
+Failures come back as JSON with a numeric `errorCode`:
+
+```json
+{ "errorCode": 301, "error": "API Key must be of length 64." }
+```
+
+**Authentication failures use HTTP 403, not 401.** A malformed or unknown key returns 403
+(`errorCode` 301 for a wrong-length key). This matters for an extension: 403 cannot be read as
+"credentials fine, permission missing", because a plain typo produces the same status. Since
+MoneyMoney discards the response body along with the failed request, a 403 message has to name
+every possible cause – wrong key or secret, missing `View access`, IP not whitelisted.
 
 ## Rate limits **[verified – live response headers]**
 
@@ -63,16 +79,20 @@ requests per refresh, but the headers are worth reading for a clear error messag
 
 ## Endpoints needed
 
-### `GET /v2/balance` – private **[unconfirmed – requires a key]**
+### `GET /v2/balance` – private **[verified – live, 2026-08-16]**
 
-Optional `symbol` param. Per the SDKs the response is:
+Optional `symbol` param. Confirmed against a real account: a top-level **array**, three string
+fields per entry, exactly as both SDKs document.
 
 ```json
-[{ "symbol": "BTC", "available": "1.57593193", "inOrder": "0.74832374" }]
+[{ "symbol": "EUR", "available": "100.00", "inOrder": "0" }]
 ```
 
-Total holding = `available + inOrder`. **Must be confirmed against a real response**, in
-particular whether staked/earning balances appear here at all – see open questions.
+- Total holding = `available + inOrder`. Both are **strings**, including a plain `"0"`.
+- Fiat appears here like any other asset, with `symbol: "EUR"`.
+- Only assets with a balance are returned; zero balances are omitted.
+- Still open: whether **staked / earning** balances appear. The confirming account held no
+  crypto at the time, so this remains untested rather than answered.
 
 ### `GET /v2/ticker/price` – public **[verified – live]**
 
@@ -81,9 +101,18 @@ particular whether staked/earning balances appear here at all – see open quest
 ```
 
 - 440 markets in one call. **All prices for the whole portfolio cost a single request.**
-- Quote currencies: **429 EUR, 11 USDC**. Nearly everything prices directly in EUR; an asset
-  quoted only in USDC needs a second hop via `USDC-EUR`.
+- Quote currencies: **429 EUR, 11 USDC**, nothing else.
 - `price` is a **string** – always `tonumber()`.
+
+**Correction to an earlier note [verified – live, 2026-08-16].** An earlier draft said an asset
+quoted only in USDC needs a second hop via `USDC-EUR`. Re-checked against the live response:
+**no such asset exists.** All eleven USDC markets – `ADA`, `BTC`, `DOGE`, `ETH`, `EURC`, `PEPE`,
+`SOL`, `SUI`, `TIA`, `USDCV`, `XRP` against USDC – have an EUR market as well. They are
+convenience pairs for traders holding stablecoin, not the only route to a price.
+
+`USDC-EUR` does exist as a market, so the fallback is implementable and worth keeping as a safety
+net against a future delisting of an EUR pair. But it is currently dead code, and the real
+unpriced case is a different one – see below.
 
 This is why no third-party price source is needed. Prices come from Bitvavo itself, so there is
 no symbol-mapping table that can silently value an unmapped asset at 0 - a common failure mode in
@@ -101,7 +130,20 @@ crypto extensions that source prices externally.
 ```
 
 One call gives a `symbol → name` map, so securities can show "Bitcoin" rather than "BTC".
-EUR is itself an asset here. Note 475 assets vs 440 markets: some have no tradable market.
+EUR is itself an asset here.
+
+**475 assets but only 440 markets. 45 assets have no price route to EUR at all**
+**[verified – live, 2026-08-16]:** `ACA`, `AERGO`, `AR`, `ATA`, `BLAST`, `BLZ`, `CKB`, `CORE`,
+`COS`, `D`, `DATA`, `DCR`, `DENT`, `DMC`, `ES`, `FLOW`, `FORTH`, `GHST`, `HIGH`, `HOOK`, `IDEX`,
+`IOTX`, `JST`, `LYX`, `MBOX`, `MDT`, `MINA`, `NANO`, `NFP`, `NKN`, `OM`, `ONE`, `ORDI`, `OXT`,
+`PHB`, `POLS`, `POLYX`, `PRIME`, `QTUM`, `RDNT`, `SOPH`, `SXP`, `THETA`, `TRU`, `UXLINK`.
+
+These are delisted from trading but can still be held, so a balance in one of them is entirely
+possible. **This – not the USDC case – is the situation the unpriced code path actually serves.**
+At roughly one asset in ten it is a normal occurrence, not an exotic edge case, which is what
+makes returning no price the right behaviour: a zero would silently understate the portfolio.
+The list is a snapshot and will drift as Bitvavo lists and delists; nothing in the code depends
+on it.
 
 ### Possible later additions **[unconfirmed]**
 
@@ -110,18 +152,39 @@ EUR is itself an asset here. Note 475 assets vs 440 markets: some have no tradab
 
 Both read-only. Only relevant if transactions are wanted alongside holdings.
 
-## API key permissions **[unconfirmed – must be read off the real UI]**
+## API key permissions **[verified – official docs]**
 
-Secondary sources list **View**, **Trade** and **Withdraw**, with wording suggesting a separate
-read-only toggle. The exact labels could not be verified: the Bitvavo help centre blocks
-automated fetching.
+Source: <https://docs.bitvavo.com/docs/get-started/>. The help centre itself still blocks
+automated fetching (HTTP 403), but the get-started page documents the creation flow in full.
 
-The minimum needed is the permission covering balance retrieval. Trading and withdrawal rights
-are not required by this extension and must stay off.
+Keys are created under *Settings → API tab → Add new API key*. Creating one requires 2FA to be
+enabled, and the secret is displayed exactly once.
 
-Bitvavo supports **IP whitelisting** on keys **[unconfirmed]** – worth recommending in the README
-if present. Note that API withdrawals reportedly bypass 2FA and email confirmation, which makes
-leaving the withdrawal right disabled genuinely important, not merely tidy.
+The permission checkboxes are:
+
+| Label | Grants |
+|---|---|
+| **View access** | view account information, including balances and transactions |
+| **Trade digital assets** | create, update and cancel orders |
+| **Withdraw digital assets** | withdraw to an external address or verified bank account |
+| **Include all subaccounts** | cancel orders and retrieve information for subaccounts |
+| **Internal Transfer** | transfer assets between subaccounts and the main account |
+| **Administrative** | create and view subaccounts |
+
+**`View access` alone is sufficient** for this extension. Everything else must stay off.
+
+> Inconsistency in Bitvavo's own documentation: the REST API introduction page calls the same
+> permission **"Read-only"**, while the get-started page calls it **"View access"**. The
+> get-started page is the one that documents the actual creation dialog, so its wording is used
+> in the README, with a note covering the other.
+
+**IP whitelisting is supported [verified]** – an *IP Whitelist* field is part of the key creation
+dialog, and multiple addresses are comma-separated. Worth recommending wherever the user has a
+static address.
+
+Bitvavo documents that **withdrawals made through the API do not require 2FA or email
+confirmation [verified]**. That removes the usual second line of defence, which is what makes
+leaving the withdrawal right disabled a real security measure rather than mere tidiness.
 
 ## Planned request budget per refresh
 
@@ -135,10 +198,14 @@ Three requests against a budget of 1000 per minute.
 
 ## Still to be verified
 
-These need a real API key or the live account UI, and are not settled facts:
+These need a real API key, and are not settled facts:
 
-1. The exact `/v2/balance` response shape.
+1. The exact `/v2/balance` response shape. Implemented against the shape both official SDKs
+   document; a mismatch raises an error rather than producing wrong numbers, but it is untested.
 2. Whether **staked / earning** balances appear in `/v2/balance` at all. Bitvavo offers staking,
-   and the SDK surface shows no dedicated endpoint for it.
-3. The exact wording of the API key permission labels in the Bitvavo UI.
-4. Whether Bitvavo offers IP whitelisting on API keys.
+   and the SDK surface shows no dedicated endpoint for it. If they are absent, a portfolio is
+   understated with no visible sign – the most consequential open question here.
+
+Resolved since the first draft: the API key permission labels and IP whitelisting support are
+now documented above from Bitvavo's official docs, and the signature construction is verified
+against the published worked example.
