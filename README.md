@@ -1,158 +1,157 @@
-# MoneyMoney Extension for Bitvavo
+# MoneyMoney Extension für Bitvavo
 
-*Einrichtung auf Deutsch: [README.de.md](README.de.md)*
+Inoffizielle [MoneyMoney](https://moneymoney.app)-Extension, die Ihre Guthaben von
+[Bitvavo](https://bitvavo.com) abruft und als Wertpapier-Portfolio in EUR darstellt.
 
-Unofficial [MoneyMoney](https://moneymoney.app) extension that fetches your balances from
-[Bitvavo](https://bitvavo.com) and shows them as a securities portfolio valued in EUR.
-
-> Not affiliated with or endorsed by Bitvavo or MoneyMoney.
+> Steht in keiner Verbindung zu Bitvavo oder MoneyMoney.
 
 ---
 
-## What it does
+## Funktionsumfang
 
-- Lists every asset you hold as a position, using the asset's full name ("Bitcoin", not "BTC")
-- Values each position with Bitvavo's own market price, so there is no external price service
-  and no symbol mapping table that could silently value an asset at zero
-- Includes balances reserved in open orders, not just freely available ones
-- Shows your EUR cash as a position too, so the portfolio total is complete
-- Two requests per refresh; the asset name list is cached for a week
+- Listet jedes gehaltene Asset als Position, jeweils mit vollem Namen ("Bitcoin" statt "BTC")
+- Bewertet jede Position mit dem Marktpreis von Bitvavo selbst. Dadurch entfällt ein externer
+  Kursdienst, und es gibt keine Symbol-Zuordnungstabelle, die ein Asset stillschweigend mit
+  null bewerten könnte
+- Berücksichtigt auch Guthaben, die in offenen Orders gebunden sind, nicht nur frei verfügbare
+- Zeigt Ihr EUR-Guthaben ebenfalls als Position, damit die Portfoliosumme vollständig ist
+- Zwei Anfragen je Aktualisierung; die Liste der Asset-Namen wird eine Woche zwischengespeichert
 
-### Limitations
+### Einschränkungen
 
-- **Holdings only.** Deposits, withdrawals and trades are not imported.
-- **Staked or earning balances may not be included.** Whether Bitvavo reports these through the
-  balance endpoint is not yet confirmed. Compare the total against the Bitvavo app on first use.
-- **Around 45 of Bitvavo's 475 assets are delisted from trading and have no price.** You can
-  still hold them, and if you do they are listed with their quantity but no value, rather than
-  at a made-up price. The protocol window names any asset this affects, so a position never
-  disappears silently.
-
----
-
-## Requirements
-
-- **Tested with MoneyMoney 2.5.1 on macOS 26.5.2.** Earlier versions are untested rather than
-  known to be unsupported – if it works for you on an older one, please open an issue saying so.
-- A Bitvavo account with an API key that has **read permission only**
+- **Nur Bestände.** Ein- und Auszahlungen sowie Trades werden nicht importiert.
+- **Staking- und Earning-Guthaben sind möglicherweise nicht enthalten.** Ob Bitvavo diese über
+  den Balance-Endpunkt meldet, ist bislang nicht bestätigt. Vergleichen Sie die Summe bei der
+  ersten Nutzung mit der Bitvavo-App.
+- **Rund 45 der 475 Bitvavo-Assets sind vom Handel ausgeschlossen und haben keinen Kurs.**
+  Sie können solche Assets weiterhin halten. In diesem Fall werden sie mit ihrer Stückzahl,
+  aber ohne Wert angezeigt – statt mit einem erfundenen Kurs. Das Protokollfenster benennt jedes
+  betroffene Asset, sodass eine Position nie unbemerkt verschwindet.
 
 ---
 
-## Setup
+## Voraussetzungen
 
-### 1. Create a read-only API key
+- **Getestet mit MoneyMoney 2.5.1 unter macOS 26.5.2.** Ältere Versionen sind ungetestet, nicht
+  bekanntermaßen inkompatibel. Falls es bei Ihnen unter einer älteren Version funktioniert,
+  freue ich mich über einen entsprechenden Hinweis per Issue.
+- Ein Bitvavo-Konto mit einem API-Schlüssel, der **ausschließlich Leserechte** besitzt
 
-You need two-factor authentication enabled on your Bitvavo account before you can create a key.
+---
 
-1. Log in at [bitvavo.com](https://bitvavo.com/).
-2. Under your account, select **Settings**.
-3. Open the **API** tab and select **Add new API key**.
-4. Enter a **Name** for the key, for example `MoneyMoney`.
-5. Under **IP Whitelist**, enter the IP address this Mac makes requests from. See the note below.
-6. Tick **View access** and nothing else.
-7. Enter your **2FA** code and select **Confirm**.
-8. Copy the key and the secret straight into MoneyMoney. **Bitvavo shows the secret once and
-   cannot show it again.**
+## 1. API-Schlüssel mit Leserechten erstellen
 
-**Enable only `View access`** – "view account information, including balances and transactions".
-Leave **Trade digital assets**, **Withdraw digital assets**, **Internal Transfer** and
-**Administrative** switched off. This extension only ever reads, so those rights would add risk
-without adding function.
+Für das Erstellen eines Schlüssels muss die Zwei-Faktor-Authentifizierung in Ihrem
+Bitvavo-Konto aktiviert sein.
 
-> Parts of Bitvavo's documentation call this permission "Read-only" rather than "View access".
-> If the wording in your account differs, tick whichever single permission grants read access.
+1. Bei [bitvavo.com](https://bitvavo.com/) anmelden.
+2. Im Konto **Settings** (Einstellungen) auswählen.
+3. Den Reiter **API** öffnen und **Add new API key** wählen.
+4. Einen **Namen** für den Schlüssel eingeben, zum Beispiel `MoneyMoney`.
+5. Unter **IP Whitelist** die IP-Adresse eintragen, von der dieser Mac Anfragen stellt. Siehe
+   den Hinweis weiter unten.
+6. **Ausschließlich** `View access` ankreuzen.
+7. Den **2FA**-Code eingeben und **Confirm** wählen.
+8. Schlüssel und Secret direkt in MoneyMoney übertragen. **Bitvavo zeigt das Secret nur ein
+   einziges Mal an und kann es nicht erneut anzeigen.**
 
-Withdrawal rights matter more here than on most exchanges. Bitvavo documents that withdrawals
-made through the API **do not require 2FA or email confirmation** – so a key with that right,
-if leaked, is a drained account with nothing standing in the way.
+**Nur `View access` aktivieren** – "view account information, including balances and
+transactions". **Trade digital assets**, **Withdraw digital assets**, **Internal Transfer** und
+**Administrative** bleiben deaktiviert. Die Extension liest ausschließlich; diese Rechte würden
+das Risiko erhöhen, ohne einen Nutzen zu bringen.
 
-**On the IP whitelist:** a key restricted to one IP address is useless to anyone who steals it,
-which is the single most effective thing you can do here. It only works if your connection has a
-static IP; on a normal consumer line the address changes and the key stops working until you
-update it. Multiple addresses are separated by commas. If you can't use a static IP, leaving the
-field empty works – but then the key's safety rests entirely on it never leaking.
+> Teile der Bitvavo-Dokumentation nennen diese Berechtigung "Read-only" statt "View access".
+> Falls die Bezeichnung in Ihrem Konto abweicht, wählen Sie die eine Berechtigung, die lesenden
+> Zugriff gewährt.
 
-### 2. Install the extension
+Das Auszahlungsrecht wiegt hier schwerer als bei den meisten Börsen: Bitvavo dokumentiert, dass
+Auszahlungen über die API **weder 2FA noch eine E-Mail-Bestätigung erfordern**. Ein Schlüssel mit
+diesem Recht bedeutet im Fall eines Lecks ein leergeräumtes Konto ohne Zwischenschritt.
 
-**Signed (recommended, once available):** download from
-<https://moneymoney.app/extensions/> and drop the file into MoneyMoney's `Extensions` folder
-(*Help → Show Database in Finder*).
+**Zur IP-Whitelist:** Ein auf eine IP-Adresse beschränkter Schlüssel ist für einen Dieb wertlos –
+die wirksamste einzelne Maßnahme an dieser Stelle. Sie funktioniert nur bei einer statischen
+IP-Adresse; an einem gewöhnlichen Privatanschluss wechselt die Adresse, und der Schlüssel
+funktioniert bis zur Aktualisierung nicht mehr. Mehrere Adressen werden durch Kommas getrennt.
+Ohne statische IP kann das Feld leer bleiben – dann hängt die Sicherheit des Schlüssels aber
+allein daran, dass er nie nach außen gelangt.
 
-**Unsigned, from this repository:**
+---
 
-1. Download `Bitvavo.lua` from the [latest release](../../releases/latest).
-2. *Help → Show Database in Finder*, then move the file into `Extensions`.
-3. *MoneyMoney → Settings → Extensions* → uncheck **Verify digital signature of extensions**.
-   On the App Store build this may require the beta channel.
-4. Restart MoneyMoney.
+## 2. Extension installieren
 
-### 3. Add the account
+**Signiert (empfohlen, sobald verfügbar):** Download über <https://moneymoney.app/extensions/>,
+anschließend die Datei in den Ordner `Extensions` legen
+(*Hilfe → Zeige Datenbank im Finder*).
 
-*Account → Add Account → Other → Bitvavo*, then enter:
+**Unsigniert, aus diesem Repository:**
 
-| Field | Value |
+1. `Bitvavo.lua` aus dem [aktuellen Release](../../releases/latest) herunterladen.
+2. *Hilfe → Zeige Datenbank im Finder*, die Datei in den Ordner `Extensions` verschieben.
+3. *MoneyMoney → Einstellungen → Extensions* → Haken bei **Digitale Signatur von Extensions
+   überprüfen** entfernen. In der App-Store-Version ist dafür ggf. die Beta-Version nötig.
+4. MoneyMoney neu starten.
+
+---
+
+## 3. Konto hinzufügen
+
+*Konto → Konto hinzufügen → Andere → Bitvavo*, dann eingeben:
+
+| Feld | Wert |
 |---|---|
-| User name | Your Bitvavo **API key** |
-| Password | Your Bitvavo **API secret** |
+| Benutzername | Ihr Bitvavo-**API-Schlüssel** |
+| Kennwort | Ihr Bitvavo-**API-Secret** |
 
-MoneyMoney does not let an extension rename these two fields, so they keep their standard
-labels. The key goes in the upper field, the secret in the lower one. Tick **Save password**,
-otherwise you are asked for the 64-character secret on every refresh.
+MoneyMoney erlaubt Extensions nicht, diese beiden Felder umzubenennen – sie behalten daher ihre
+Standardbezeichnungen. Der Schlüssel gehört in das obere Feld, das Secret in das untere.
+**Kennwort sichern** ankreuzen, sonst wird das 64-stellige Secret bei jeder Aktualisierung
+erneut abgefragt.
 
-On the first connection MoneyMoney asks you to confirm the SSL certificate for
-`api.bitvavo.com`. That is normal for a host it has not seen before.
-
-### If setup fails
-
-MoneyMoney reports every rejected request as *"Der Server Ihrer Bank meldet einen internen
-Fehler"* / *"The server of your bank reported an internal error"*, whatever the real cause was.
-The extension cannot replace that text – MoneyMoney stops the script before it can say anything.
-
-So if you see it, work through these in order:
-
-1. **Key and secret the right way round?** The user name field takes the key, the password field
-   the secret. A wrong-length key is caught with a proper message; a wrong secret is not.
-2. **Is `View access` enabled** on the key?
-3. **Did your IP address change** since you created the key? A whitelisted key stops working the
-   moment your connection gets a new address. This is the most common cause of a setup that
-   worked yesterday and fails today.
-4. **Has the key been revoked or expired?**
-
-The protocol window (*Window → Protocol*) shows the number of characters received in each field,
-which usually settles cause 1 immediately.
+Beim ersten Verbindungsaufbau fragt MoneyMoney nach der Bestätigung des SSL-Zertifikats für
+`api.bitvavo.com`. Das ist bei einem noch unbekannten Server normal.
 
 ---
 
-## Security
+## Wenn die Einrichtung fehlschlägt
 
-- Read-only: the extension issues read requests only. It never places an order, moves funds or
-  changes a setting.
-- Your API key and secret stay in MoneyMoney's encrypted database. They are sent only to
-  Bitvavo, in request headers, never in a URL or query string.
-- Nothing is logged, cached or transmitted anywhere else. The only cached data is the public
-  list of asset display names.
+MoneyMoney meldet jede abgelehnte Anfrage als *"Der Server Ihrer Bank meldet einen internen
+Fehler"* – unabhängig von der tatsächlichen Ursache. Die Extension kann diesen Text nicht
+ersetzen: MoneyMoney bricht das Skript ab, bevor es etwas ausgeben kann.
 
----
+Prüfen Sie in dieser Reihenfolge:
 
-## Development
+1. **Schlüssel und Secret richtig herum?** In das Feld Benutzername gehört der Schlüssel, in das
+   Feld Kennwort das Secret. Ein Schlüssel falscher Länge wird mit einer klaren Meldung erkannt,
+   ein falsches Secret nicht.
+2. **Ist `View access` aktiviert?**
+3. **Hat sich Ihre IP-Adresse geändert?** Ein auf eine IP beschränkter Schlüssel funktioniert ab
+   dem Moment nicht mehr, in dem der Anschluss eine neue Adresse erhält. Das ist die häufigste
+   Ursache dafür, dass eine gestern funktionierende Einrichtung heute fehlschlägt.
+4. **Wurde der Schlüssel widerrufen oder ist er abgelaufen?**
 
-```bash
-make check     # syntax, encoding, indentation and secret checks
-make install   # copy into MoneyMoney's Extensions folder
-```
-
-API details, including what is verified and what is not, are in
-[`docs/api-notes.md`](docs/api-notes.md).
-
----
-
-## AI assistance
-
-Parts of this extension were written or reviewed with AI assistance. All code has been reviewed
-and tested by the author before release.
+Das Protokollfenster (*Fenster → Protokoll*) zeigt die Anzahl der empfangenen Zeichen je Feld –
+das klärt Ursache 1 meist sofort.
 
 ---
 
-## License
+## Sicherheit
 
-MIT - see [LICENSE](LICENSE).
+- Nur lesender Zugriff: Die Extension stellt ausschließlich Leseanfragen. Sie erteilt niemals
+  eine Order, bewegt keine Guthaben und ändert keine Einstellung.
+- API-Schlüssel und Secret verbleiben in der verschlüsselten Datenbank von MoneyMoney. Sie werden
+  ausschließlich an Bitvavo übertragen, und zwar in Request-Headern, niemals in einer URL.
+- Es werden keine Daten protokolliert oder an Dritte übermittelt. Zwischengespeichert wird
+  allein die öffentliche Liste der Asset-Namen.
+
+---
+
+## KI-Unterstützung
+
+Teile dieser Extension wurden mit KI-Unterstützung geschrieben oder überprüft. Der gesamte Code
+wurde vor der Veröffentlichung vom Autor geprüft und getestet.
+
+---
+
+## Lizenz
+
+MIT – siehe [LICENSE](LICENSE).
