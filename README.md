@@ -75,7 +75,6 @@ Beim ersten Verbindungsaufbau fragt MoneyMoney nach der Bestätigung des SSL-Zer
 ## Sicherheit
 
 - **Nur lesender Zugriff.** Die Extension stellt ausschließlich Leseanfragen. Sie erteilt niemals eine Order, bewegt keine Bestände und ändert keine Einstellung.
-- **Das Secret verlässt Ihren Mac nicht.** Es dient nur zum Signieren der Anfragen. Übertragen wird allein der API-Schlüssel, in Request-Headern, niemals in einer URL. Beide bleiben in der verschlüsselten Datenbank von MoneyMoney.
 - **Nichts geht an Dritte.** Die Extension spricht ausschließlich mit `api.bitvavo.com`. In MoneyMoneys Protokollfenster schreibt sie die Länge der eingegebenen Felder – nie deren Inhalt – sowie die Namen von Assets ohne Kurs. Das bleibt auf Ihrem Rechner.
 
 ---
