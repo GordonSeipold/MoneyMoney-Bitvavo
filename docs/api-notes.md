@@ -91,8 +91,8 @@ fields per entry, exactly as both SDKs document.
 - Total holding = `available + inOrder`. Both are **strings**, including a plain `"0"`.
 - Fiat appears here like any other asset, with `symbol: "EUR"`.
 - Only assets with a balance are returned; zero balances are omitted.
-- Still open: whether **staked / earning** balances appear. The confirming account held no
-  crypto at the time, so this remains untested rather than answered.
+- Still open: whether **staked / earning** balances appear. The account used for verification
+  held no crypto, so this is untested rather than answered.
 
 ### `GET /v2/ticker/price` – public **[verified – live]**
 
@@ -104,15 +104,14 @@ fields per entry, exactly as both SDKs document.
 - Quote currencies: **429 EUR, 11 USDC**, nothing else.
 - `price` is a **string** – always `tonumber()`.
 
-**Correction to an earlier note [verified – live, 2026-08-16].** An earlier draft said an asset
-quoted only in USDC needs a second hop via `USDC-EUR`. Re-checked against the live response:
-**no such asset exists.** All eleven USDC markets – `ADA`, `BTC`, `DOGE`, `ETH`, `EURC`, `PEPE`,
-`SOL`, `SUI`, `TIA`, `USDCV`, `XRP` against USDC – have an EUR market as well. They are
-convenience pairs for traders holding stablecoin, not the only route to a price.
+**No asset is priced only in USDC [verified – live, 2026-08-16].** All eleven USDC markets –
+`ADA`, `BTC`, `DOGE`, `ETH`, `EURC`, `PEPE`, `SOL`, `SUI`, `TIA`, `USDCV` and `XRP` against
+USDC – have an EUR market as well. They are convenience pairs for traders holding stablecoin,
+not the only route to a price, so no two-hop conversion via `USDC-EUR` is required.
 
-`USDC-EUR` does exist as a market, so the fallback is implementable and worth keeping as a safety
-net against a future delisting of an EUR pair. But it is currently dead code, and the real
-unpriced case is a different one – see below.
+`USDC-EUR` does exist as a market, so that fallback is implementable and worth keeping as a
+safety net should an EUR pair ever be delisted. Today it is dead code. The situation that
+actually leaves an asset unpriced is a different one – see below.
 
 This is why no third-party price source is needed. Prices come from Bitvavo itself, so there is
 no symbol-mapping table that can silently value an unmapped asset at 0 - a common failure mode in
@@ -139,11 +138,10 @@ EUR is itself an asset here.
 `PHB`, `POLS`, `POLYX`, `PRIME`, `QTUM`, `RDNT`, `SOPH`, `SXP`, `THETA`, `TRU`, `UXLINK`.
 
 These are delisted from trading but can still be held, so a balance in one of them is entirely
-possible. **This – not the USDC case – is the situation the unpriced code path actually serves.**
-At roughly one asset in ten it is a normal occurrence, not an exotic edge case, which is what
-makes returning no price the right behaviour: a zero would silently understate the portfolio.
-The list is a snapshot and will drift as Bitvavo lists and delists; nothing in the code depends
-on it.
+possible. **This is the case the unpriced code path exists for.** At roughly one asset in ten it
+is a normal occurrence rather than an exotic edge case, which is what makes returning no price
+the right behaviour: a zero would silently understate the portfolio. The list is a snapshot and
+will drift as Bitvavo lists and delists; nothing in the code depends on it.
 
 ### Possible later additions **[unconfirmed]**
 
@@ -186,15 +184,17 @@ Bitvavo documents that **withdrawals made through the API do not require 2FA or 
 confirmation [verified]**. That removes the usual second line of defence, which is what makes
 leaving the withdrawal right disabled a real security measure rather than mere tidiness.
 
-## Planned request budget per refresh
+## Request budget per refresh
 
-| Call | Weight | Purpose |
-|---|---|---|
-| `GET /v2/balance` | 1 | holdings |
-| `GET /v2/ticker/price` | 1 | all prices, one call |
-| `GET /v2/assets` | ~4 | symbol → display name (cacheable via `LocalStorage`) |
+| Call | Weight | Frequency | Purpose |
+|---|---|---|---|
+| `GET /v2/balance` | 1 | every refresh | holdings |
+| `GET /v2/ticker/price` | 1 | every refresh | all prices in one call |
+| `GET /v2/assets` | ~4 | once a week | symbol → display name, cached in `LocalStorage` |
 
-Three requests against a budget of 1000 per minute.
+**Two requests on a normal refresh**, three when the cached display names expire, against a
+budget of 1000 weight per minute. Display names change rarely, which is what makes the weekly
+TTL worth the small amount of state it costs.
 
 ## Still to be verified
 
@@ -206,6 +206,4 @@ These need a real API key, and are not settled facts:
    and the SDK surface shows no dedicated endpoint for it. If they are absent, a portfolio is
    understated with no visible sign – the most consequential open question here.
 
-Resolved since the first draft: the API key permission labels and IP whitelisting support are
-now documented above from Bitvavo's official docs, and the signature construction is verified
-against the published worked example.
+Anyone able to settle either point against an account holding crypto is welcome to open an issue.
