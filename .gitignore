@@ -1,9 +1,20 @@
-.DS_Store
-*.luac
+# Allowlist, not a blocklist.
+#
+# Everything at the repository root is excluded, and only what belongs in a release is
+# allowed back in. The failure modes are not symmetric: a blocklist that misses a pattern
+# publishes the file and nobody notices, while an allowlist that misses an entry leaves the
+# file out of the repository, which is obvious the first time someone looks.
+#
+# Note that this only affects untracked files. Anything already committed stays committed.
 
-# Local working notes: internal state, open questions, handover.
-# The published documentation is README.md and docs/api-notes.md.
-CL*.md
-MEM*.md
-AGENTS.md
-GEMINI.md
+/*
+
+!/.editorconfig
+!/.gitignore
+!/LICENSE
+!/README.md
+!/*.lua
+
+!/.github/
+!/docs/
+!/tools/
