@@ -38,8 +38,6 @@ Diese Web Banking Extension für [MoneyMoney](https://moneymoney.app) ruft Ihre 
 4. Die **IP-Whitelist** ausfüllen, sofern gewünscht; andernfalls leer lassen.
 5. Schlüssel und Secret übernehmen. Das Secret wird nur ein einziges Mal angezeigt.
 
-Auszahlungen über die Bitvavo-API erfordern weder 2FA noch eine E-Mail-Bestätigung. Ein Schlüssel mit Auszahlungsrecht wäre im Fall eines Lecks daher besonders folgenschwer.
-
 ---
 
 ## 2. Extension installieren
