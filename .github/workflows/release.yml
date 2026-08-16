@@ -1,0 +1,41 @@
+name: Release
+
+# Triggered only by a maintainer pushing a version tag. No untrusted event
+# payload (issue/PR/comment text) is read anywhere in this workflow, so there
+# is no script-injection surface in the run: steps below.
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install Lua
+        run: sudo apt-get update && sudo apt-get install -y lua5.4
+
+      - name: Verify
+        run: ./check.sh
+
+      - name: Check whether the release is signed
+        run: |
+          if grep -q '^-- SIGNATURE:' *.lua; then
+            echo "This release is signed."
+          else
+            echo "::warning::This release is unsigned. Users must disable signature verification in MoneyMoney."
+          fi
+
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: '*.lua'
+          generate_release_notes: true
