@@ -1,6 +1,9 @@
 .DS_Store
 *.luac
 
-# Local working notes - internal state, open questions, handover.
-# Never published: docs/api-notes.md is the public contributor documentation.
-CLAUDE.md
+# Local working notes: internal state, open questions, handover.
+# The published documentation is README.md and docs/api-notes.md.
+CL*.md
+MEM*.md
+AGENTS.md
+GEMINI.md
