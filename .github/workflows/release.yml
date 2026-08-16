@@ -24,7 +24,7 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y lua5.4
 
       - name: Verify
-        run: ./check.sh
+        run: ./tools/check.sh
 
       - name: Check whether the release is signed
         run: |

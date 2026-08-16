@@ -2,9 +2,13 @@
 # Verification gate 1 for a MoneyMoney extension repository.
 # Checks every .lua file at the repository root. Exits non-zero on any failure.
 #
-# Usage: ./check.sh
+# Usage: tools/check.sh
 
 set -u
+
+# The script lives in tools/ but checks the .lua files at the repository root, so it
+# must not depend on the directory it was invoked from.
+cd "$(dirname "$0")/.." || exit 1
 
 fail=0
 tab=$(printf '\t')

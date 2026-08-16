@@ -1,8 +1,8 @@
 # MoneyMoney Extension für Bitvavo
 
-Inoffizielle [MoneyMoney](https://moneymoney.app)-Extension, die Ihre Guthaben von [Bitvavo](https://bitvavo.com) abruft und als Wertpapier-Portfolio in EUR darstellt.
+Diese Web Banking Extension für [MoneyMoney](https://moneymoney.app) ruft Ihre Guthaben bei [Bitvavo](https://bitvavo.com) ab und stellt sie als Wertpapier-Portfolio in EUR dar.
 
-> Ein unabhängiges Projekt: Weder Bitvavo noch MoneyMoney sind daran beteiligt, haben es geprüft oder leisten Support dafür.
+> Bitte beachten Sie: Weder Bitvavo noch MoneyMoney leisten für diese Extension Support oder sind an diesem Projekt beteiligt.
 
 ---
 
