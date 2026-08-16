@@ -1,5 +1,7 @@
 # MoneyMoney Extension for Bitvavo
 
+*Einrichtung auf Deutsch: [README.de.md](README.de.md)*
+
 Unofficial [MoneyMoney](https://moneymoney.app) extension that fetches your balances from
 [Bitvavo](https://bitvavo.com) and shows them as a securities portfolio valued in EUR.
 
