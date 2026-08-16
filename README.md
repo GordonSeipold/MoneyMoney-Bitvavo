@@ -39,41 +39,17 @@ Inoffizielle [MoneyMoney](https://moneymoney.app)-Extension, die Ihre Guthaben v
 
 ---
 
-## 1. API-Schlüssel mit Leserechten erstellen
+## 1. Bei Bitvavo einen API-Schlüssel mit Leserechten erstellen
 
-Für das Erstellen eines Schlüssels muss die Zwei-Faktor-Authentifizierung in Ihrem
-Bitvavo-Konto aktiviert sein.
+1. Bei [bitvavo.com](https://bitvavo.com/) anmelden und die Konto-Einstellungen öffnen.
+2. Im Bereich **API** einen neuen Schlüssel anlegen und benennen, zum Beispiel `MoneyMoney`.
+3. Ausschließlich **Leserechte** (`View access`) aktivieren – keine Handels-, Auszahlungs-
+   oder Transferrechte.
+4. Die **IP-Whitelist** ausfüllen, sofern gewünscht; andernfalls leer lassen.
+5. Schlüssel und Secret übernehmen. Das Secret wird nur ein einziges Mal angezeigt.
 
-1. Bei [bitvavo.com](https://bitvavo.com/) anmelden.
-2. Im Konto **Settings** (Einstellungen) auswählen.
-3. Den Reiter **API** öffnen und **Add new API key** wählen.
-4. Einen **Namen** für den Schlüssel eingeben, zum Beispiel `MoneyMoney`.
-5. Unter **IP Whitelist** die IP-Adresse eintragen, von der dieser Mac Anfragen stellt. Siehe
-   den Hinweis weiter unten.
-6. **Ausschließlich** `View access` ankreuzen.
-7. Den **2FA**-Code eingeben und **Confirm** wählen.
-8. Schlüssel und Secret direkt in MoneyMoney übertragen. **Bitvavo zeigt das Secret nur ein
-   einziges Mal an und kann es nicht erneut anzeigen.**
-
-**Nur `View access` aktivieren** – "view account information, including balances and
-transactions". **Trade digital assets**, **Withdraw digital assets**, **Internal Transfer** und
-**Administrative** bleiben deaktiviert. Die Extension liest ausschließlich; diese Rechte würden
-das Risiko erhöhen, ohne einen Nutzen zu bringen.
-
-> Teile der Bitvavo-Dokumentation nennen diese Berechtigung "Read-only" statt "View access".
-> Falls die Bezeichnung in Ihrem Konto abweicht, wählen Sie die eine Berechtigung, die lesenden
-> Zugriff gewährt.
-
-Das Auszahlungsrecht wiegt hier schwerer als bei den meisten Börsen: Bitvavo dokumentiert, dass
-Auszahlungen über die API **weder 2FA noch eine E-Mail-Bestätigung erfordern**. Ein Schlüssel mit
-diesem Recht bedeutet im Fall eines Lecks ein leergeräumtes Konto ohne Zwischenschritt.
-
-**Zur IP-Whitelist:** Ein auf eine IP-Adresse beschränkter Schlüssel ist für einen Dieb wertlos –
-die wirksamste einzelne Maßnahme an dieser Stelle. Sie funktioniert nur bei einer statischen
-IP-Adresse; an einem gewöhnlichen Privatanschluss wechselt die Adresse, und der Schlüssel
-funktioniert bis zur Aktualisierung nicht mehr. Mehrere Adressen werden durch Kommas getrennt.
-Ohne statische IP kann das Feld leer bleiben – dann hängt die Sicherheit des Schlüssels aber
-allein daran, dass er nie nach außen gelangt.
+Auszahlungen über die Bitvavo-API erfordern weder 2FA noch eine E-Mail-Bestätigung. Ein
+Schlüssel mit Auszahlungsrecht wäre im Fall eines Lecks daher besonders folgenschwer.
 
 ---
 
