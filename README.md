@@ -1,6 +1,6 @@
 # MoneyMoney Extension für Bitvavo
 
-Diese Web Banking Extension für [MoneyMoney](https://moneymoney.app) ruft Ihre Guthaben bei [Bitvavo](https://bitvavo.com) ab und stellt sie als Wertpapier-Portfolio in EUR dar.
+Diese Web Banking Extension für [MoneyMoney](https://moneymoney.app) ruft Ihre Guthaben bei [Bitvavo](https://bitvavo.com) ab und zeigt sie als Depotpositionen mit aktuellen Kursen in EUR.
 
 > Bitte beachten Sie: Weder Bitvavo noch MoneyMoney leisten für diese Extension Support oder sind an diesem Projekt beteiligt.
 
@@ -13,6 +13,7 @@ Diese Web Banking Extension für [MoneyMoney](https://moneymoney.app) ruft Ihre 
 - Berücksichtigt auch Guthaben, die in offenen Orders gebunden sind, nicht nur frei verfügbare
 - Zeigt Ihr EUR-Guthaben ebenfalls als Position, damit die Portfoliosumme vollständig ist
 - Zwei Anfragen je Aktualisierung; die Liste der Asset-Namen wird eine Woche zwischengespeichert
+- Das Konto führt MoneyMoney als Wertpapierdepot – einen eigenen Kontotyp für Krypto gibt es dort nicht
 
 ### Einschränkungen
 
