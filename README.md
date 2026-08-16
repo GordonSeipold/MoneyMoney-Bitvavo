@@ -46,7 +46,7 @@ Auszahlungen über die Bitvavo-API erfordern weder 2FA noch eine E-Mail-Bestäti
 
 **Signiert (empfohlen, sobald verfügbar):**
 
-1. Extension auf <https://moneymoney.app/extensions/> herunterladen
+1. Extension "Bestandsabfrage für Bitvavo.com" auf <https://moneymoney.app/extensions/> herunterladen
 2. *MoneyMoney → Hilfe → Zeige Datenbank im Finder*, die heruntergeladene Datei in den Ordner `Extensions` verschieben.
 3. MoneyMoney neu starten.
 
