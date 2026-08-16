@@ -1,6 +1,9 @@
 -- Unofficial Bitvavo Extension (https://bitvavo.com) for MoneyMoney
--- Fetches crypto and EUR balances and presents them as portfolio positions priced in EUR.
--- They are not securities; MoneyMoney simply has no account type for crypto.
+-- Fetches crypto and EUR balances and lists each asset with its current EUR price.
+-- MoneyMoney has no account type for crypto, so the account appears as a portfolio.
+--
+-- Fixed-staking balances are NOT included: Bitvavo reports them through a separate
+-- endpoint (GET /stakingBalance) that this version deliberately does not call.
 --
 -- Data sources:
 --   https://api.bitvavo.com/v2  - balances (private), market prices and asset names (public)
@@ -32,7 +35,7 @@ WebBanking{
   -- Pre-release. 1.0 is reserved for the first signed, published build; until then every
   -- version handed over for testing gets the next 0.x, so the protocol window says which
   -- build is actually loaded.
-  version  = 0.5,
+  version  = 0.6,
   url      = "https://bitvavo.com",
   services = { BANK_CODE },
   -- MoneyMoney gives an extension no way to rename the credential fields, so this description

@@ -1,6 +1,6 @@
 # MoneyMoney Extension für Bitvavo
 
-Diese Web Banking Extension für [MoneyMoney](https://moneymoney.app) ruft Ihre Guthaben bei [Bitvavo](https://bitvavo.com) ab und zeigt sie als Depotpositionen mit aktuellen Kursen in EUR.
+Diese Web Banking Extension für [MoneyMoney](https://moneymoney.app) ruft Ihre Bestände bei [Bitvavo](https://bitvavo.com) ab und zeigt jedes Asset als Position mit aktuellem Kurs in EUR.
 
 > Bitte beachten Sie: Weder Bitvavo noch MoneyMoney leisten für diese Extension Support oder sind an diesem Projekt beteiligt.
 
@@ -10,15 +10,15 @@ Diese Web Banking Extension für [MoneyMoney](https://moneymoney.app) ruft Ihre 
 
 - Listet jedes gehaltene Asset als Position, jeweils mit vollem Namen ("Bitcoin" statt "BTC")
 - Bewertet jede Position mit dem Marktpreis von Bitvavo selbst. Dadurch entfällt ein externer Kursdienst, und es gibt keine Symbol-Zuordnungstabelle, die ein Asset stillschweigend mit null bewerten könnte
-- Berücksichtigt auch Guthaben, die in offenen Orders gebunden sind, nicht nur frei verfügbare
-- Zeigt Ihr EUR-Guthaben ebenfalls als Position, damit die Portfoliosumme vollständig ist
+- Berücksichtigt auch Bestände, die in offenen Orders gebunden sind, nicht nur frei verfügbare
+- Zeigt auch Ihren EUR-Bestand als Position, damit die Gesamtsumme vollständig ist
 - Zwei Anfragen je Aktualisierung; die Liste der Asset-Namen wird eine Woche zwischengespeichert
-- Das Konto führt MoneyMoney als Wertpapierdepot – einen eigenen Kontotyp für Krypto gibt es dort nicht
+- In MoneyMoney erscheint das Konto als Wertpapierdepot; einen eigenen Kontotyp für Krypto gibt es dort nicht
 
 ### Einschränkungen
 
-- **Nur Bestände.** Ein- und Auszahlungen sowie Trades werden nicht importiert.
-- **Staking- und Earning-Guthaben sind möglicherweise nicht enthalten.** Ob Bitvavo diese über den Balance-Endpunkt meldet, ist bislang nicht bestätigt. Vergleichen Sie die Summe bei der ersten Nutzung mit der Bitvavo-App.
+- **Nur aktuelle Bestände.** Ein- und Auszahlungen sowie Trades werden nicht importiert.
+- **Fest gestakte Bestände sind nicht enthalten.** Bitvavo meldet sie über einen eigenen Endpunkt, den diese Version nicht abfragt. Wenn Sie staken, zeigt MoneyMoney entsprechend weniger an als die Bitvavo-App.
 - **Rund 45 der 475 Bitvavo-Assets sind vom Handel ausgeschlossen und haben keinen Kurs.** Sie können solche Assets weiterhin halten. In diesem Fall werden sie mit ihrer Stückzahl, aber ohne Wert angezeigt – statt mit einem erfundenen Kurs. Das Protokollfenster benennt jedes betroffene Asset, sodass eine Position nie unbemerkt verschwindet.
 
 ---
@@ -96,7 +96,7 @@ Folgt darauf `Bitvavo: login check succeeded.`, waren die Zugangsdaten in Ordnun
 
 ## Sicherheit
 
-- Nur lesender Zugriff: Die Extension stellt ausschließlich Leseanfragen. Sie erteilt niemals eine Order, bewegt keine Guthaben und ändert keine Einstellung.
+- Nur lesender Zugriff: Die Extension stellt ausschließlich Leseanfragen. Sie erteilt niemals eine Order, bewegt keine Bestände und ändert keine Einstellung.
 - API-Schlüssel und Secret verbleiben in der verschlüsselten Datenbank von MoneyMoney. Sie werden ausschließlich an Bitvavo übertragen, und zwar in Request-Headern, niemals in einer URL.
 - Es werden keine Daten protokolliert oder an Dritte übermittelt. Zwischengespeichert wird allein die öffentliche Liste der Asset-Namen.
 
