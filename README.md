@@ -2,7 +2,7 @@
 
 Inoffizielle [MoneyMoney](https://moneymoney.app)-Extension, die Ihre Guthaben von [Bitvavo](https://bitvavo.com) abruft und als Wertpapier-Portfolio in EUR darstellt.
 
-> Steht in keiner Verbindung zu Bitvavo oder MoneyMoney.
+> Ein unabhängiges Projekt: Weder Bitvavo noch MoneyMoney sind daran beteiligt, haben es geprüft oder leisten Support dafür.
 
 ---
 
@@ -75,16 +75,21 @@ Beim ersten Verbindungsaufbau fragt MoneyMoney nach der Bestätigung des SSL-Zer
 
 ## Wenn die Einrichtung fehlschlägt
 
-MoneyMoney meldet jede abgelehnte Anfrage als *"Der Server Ihrer Bank meldet einen internen Fehler"* – unabhängig von der tatsächlichen Ursache. Die Extension kann diesen Text nicht ersetzen: MoneyMoney bricht das Skript ab, bevor es etwas ausgeben kann.
+MoneyMoney meldet jede abgelehnte Anfrage als *"Der Server Ihrer Bank meldet einen internen Fehler. Bitte versuchen Sie es später noch einmal."* – unabhängig von der tatsächlichen Ursache. Die Extension kann diesen Text nicht ersetzen: MoneyMoney bricht das Skript innerhalb der Anfrage ab.
 
-Prüfen Sie in dieser Reihenfolge:
+Unterscheiden lassen sich die Fälle im Protokollfenster (*Fenster → Protokoll*). Die Extension schreibt dort bei jeder Anmeldung eine Zeile mit den Längen beider Felder – nur die Längen, nie die Werte selbst:
 
-1. **Schlüssel und Secret richtig herum?** In das Feld Benutzername gehört der Schlüssel, in das Feld Kennwort das Secret. Ein Schlüssel falscher Länge wird mit einer klaren Meldung erkannt, ein falsches Secret nicht.
-2. **Ist `View access` aktiviert?**
-3. **Hat sich Ihre IP-Adresse geändert?** Ein auf eine IP beschränkter Schlüssel funktioniert ab dem Moment nicht mehr, in dem der Anschluss eine neue Adresse erhält. Das ist die häufigste Ursache dafür, dass eine gestern funktionierende Einrichtung heute fehlschlägt.
-4. **Wurde der Schlüssel widerrufen oder ist er abgelaufen?**
+```
+Bitvavo: credentials received, 64 and 5 characters (the key should be 64).
+```
 
-Das Protokollfenster (*Fenster → Protokoll*) zeigt die Anzahl der empfangenen Zeichen je Feld – das klärt Ursache 1 meist sofort.
+Folgt darauf `Bitvavo: login check succeeded.`, waren die Zugangsdaten in Ordnung und die Ursache liegt nicht bei ihnen. Andernfalls arbeiten Sie diese Liste von oben nach unten ab:
+
+1. **Schlüssel und Secret vertauscht oder unvollständig eingefügt.** Die erste Zahl der Protokollzeile ist die Länge des Feldes Benutzername und muss 64 sein. Weicht sie ab, zeigt MoneyMoney statt der allgemeinen Meldung einen eindeutigen Hinweis der Extension – dann gehört der Schlüssel ins Feld Benutzername und das Secret ins Feld Kennwort. Steht dort 64, ist diese Ursache ausgeschlossen. Führende und abschließende Leerzeichen entfernt die Extension selbst; ein mitkopiertes Leerzeichen kommt als Ursache nicht in Frage.
+2. **IP-Whitelist passt nicht mehr.** Bei Bitvavo in den Konto-Einstellungen, Bereich **API**: Ist beim Schlüssel eine IP-Adresse hinterlegt, muss sie Ihrer aktuellen öffentlichen Adresse entsprechen. Eine leere Whitelist schließt die Ursache aus. Das ist der häufigste Grund dafür, dass eine gestern funktionierende Einrichtung heute fehlschlägt: Der Anschluss hat eine neue Adresse erhalten.
+3. **`View access` ist nicht aktiviert.** Gleiche Ansicht: Fehlt dem Schlüssel dieses Recht, beantwortet Bitvavo jede Anfrage mit HTTP 403 und Sie sehen die allgemeine Meldung. Ist es gesetzt, ist die Ursache ausgeschlossen.
+4. **Schlüssel widerrufen oder abgelaufen.** Gleiche Ansicht: Erscheint der Schlüssel dort nicht mehr oder ist er als abgelaufen markiert, ist das die Ursache.
+5. **Falsches Secret.** Bleibt übrig, wenn 1 bis 4 ausgeschlossen sind. Das Secret wird nicht auf Länge geprüft und ist nach dem Anlegen nicht mehr einsehbar, ein Tippfehler oder eine abgeschnittene Kopie fällt daher nirgends auf. Legen Sie einen neuen Schlüssel an und tragen Sie beide Werte erneut ein.
 
 ---
 
