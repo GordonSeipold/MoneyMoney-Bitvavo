@@ -1,9 +1,12 @@
 # Allowlist, not a blocklist.
 #
-# Everything at the repository root is excluded, and only what belongs in a release is
-# allowed back in. The failure modes are not symmetric: a blocklist that misses a pattern
-# publishes the file and nobody notices, while an allowlist that misses an entry leaves the
-# file out of the repository, which is obvious the first time someone looks.
+# Everything is excluded, and only what belongs in a release is allowed back in. The failure
+# modes are not symmetric: a blocklist that misses a pattern publishes the file and nobody
+# notices, while an allowlist that misses an entry leaves the file out of the repository, which
+# is obvious the first time someone looks.
+#
+# Directories are re-included before their contents are excluded again - git cannot re-include a
+# file whose parent directory is still excluded, so the order of these lines matters.
 #
 # Note that this only affects untracked files. Anything already committed stays committed.
 
@@ -15,6 +18,12 @@
 !/README.md
 !/*.lua
 
-!/.github/
 !/docs/
+/docs/*
+!/docs/api-notes.md
+
 !/tools/
+/tools/*
+!/tools/check.sh
+
+!/.github/
