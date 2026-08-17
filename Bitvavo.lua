@@ -44,7 +44,7 @@ local ASSET_NAME_TTL = 7 * 24 * 60 * 60
 WebBanking{
   -- MAJOR.NN, two decimals - the resolution MoneyMoney prints in the protocol window. 1.00 is
   -- the first published release; every change after it increments the last position.
-  version  = 1.07,
+  version  = 1.08,
   url      = "https://bitvavo.com",
   services = { BANK_CODE },
   -- Observed on the account dialog: MoneyMoney displays none of this, and offers no way to
@@ -65,8 +65,6 @@ local connection
 -- therefore right: fresh every cycle, fetched once within it.
 local sessionBalances
 
--- Likewise the account history: both accounts read it in the same refresh cycle.
-local sessionHistory
 
 function SupportsBank (protocol, bankCode)
   return protocol == ProtocolWebBanking and bankCode == BANK_CODE
@@ -586,18 +584,33 @@ local function describeEvent (event)
   return label, (#details > 0) and table.concat(details, ", ") or nil
 end
 
--- Fetches every page of /v2/account/history and returns the events as one flat list.
-local function fetchAccountHistory ()
-  if sessionHistory ~= nil then
-    return sessionHistory
-  end
-
+-- Fetches /v2/account/history and returns the events as one flat list.
+--
+-- The range is narrowed server side with fromDate, so a refresh asks for what happened since
+-- MoneyMoney last looked instead of for everything. Without it an account with ten thousand
+-- events would page through all hundred pages on every single refresh, and the cost would grow
+-- with the account's age forever. A first sync has no cut-off and does read everything, once.
+--
+-- Deliberately not narrowed by type. The endpoint offers that filter and its enumeration is the
+-- same fourteen types Bitvavo documents - which a live account was already found to exceed. A
+-- type filter would have dropped a real credit of 20 EUR at the server, where nothing in the
+-- response could hint that anything was missing.
+local function fetchAccountHistory (since)
   local events = {}
   local page = 1
 
+  -- Milliseconds, and an integer: "%d" because Lua would otherwise render a float and Bitvavo
+  -- would reject it. fromDate is inclusive where the filter below is strict, so an event landing
+  -- exactly on the cut-off is fetched and then dropped - the two are not redundant, they draw
+  -- the boundary at different sharpness.
+  local range = ""
+  if since ~= nil then
+    range = string.format("&fromDate=%d", math.floor(since) * 1000)
+  end
+
   repeat
     local response, err = requestPrivate(string.format(
-      "/account/history?page=%d&maxItems=%d", page, HISTORY_PAGE_SIZE))
+      "/account/history?page=%d&maxItems=%d%s", page, HISTORY_PAGE_SIZE, range))
     if response == nil then
       error(describeError(err))
     end
@@ -619,7 +632,6 @@ local function fetchAccountHistory ()
     page = page + 1
   until page > totalPages or page > HISTORY_PAGE_LIMIT
 
-  sessionHistory = events
   return events
 end
 
@@ -692,7 +704,7 @@ local function refreshCashAccount (since)
   MM.printStatus(MM.localizeText("Fetching transactions"))
   return {
     balance = balance,
-    transactions = buildCashTransactions(fetchAccountHistory(), since)
+    transactions = buildCashTransactions(fetchAccountHistory(since), since)
   }
 end
 
@@ -762,7 +774,6 @@ end
 
 function EndSession ()
   sessionBalances = nil
-  sessionHistory = nil
   if connection ~= nil then
     connection:close()
     connection = nil

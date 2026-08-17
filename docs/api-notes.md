@@ -224,6 +224,18 @@ would be right either way, but merging would hide that part of it cannot be sold
 Weight 1. Returns every account event in one paginated call, which makes the separate history
 endpoints largely redundant.
 
+Parameters: `fromDate` and `toDate` (Unix milliseconds), `page`, `maxItems` (max 100), `type`.
+
+- **`fromDate` is what keeps a refresh cheap.** Without it every refresh pages through the whole
+  history, and the cost grows with the account's age: ten thousand events are a hundred requests,
+  every time. With it a refresh asks only for what happened since the last one. A first sync
+  still reads everything, once.
+- **Do not filter by `type`.** Its enumeration is the same fourteen documented types, and a live
+  account was found to return a fifteenth. Filtering server side would drop such an event where
+  nothing in the response could hint that anything was missing.
+- The spec documents no sort order for `items`. Observed responses are newest first, but nothing
+  should depend on it - narrow the range instead of breaking out of the paging loop early.
+
 ```json
 { "items": [ ... ], "currentPage": 1, "totalPages": 2, "maxItems": 5 }
 ```
