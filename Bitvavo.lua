@@ -44,7 +44,7 @@ local ASSET_NAME_TTL = 7 * 24 * 60 * 60
 WebBanking{
   -- MAJOR.NN, two decimals - the resolution MoneyMoney prints in the protocol window. 1.00 is
   -- the first published release; every change after it increments the last position.
-  version  = 1.04,
+  version  = 1.05,
   url      = "https://bitvavo.com",
   services = { BANK_CODE },
   -- Observed on the account dialog: MoneyMoney displays none of this, and offers no way to
@@ -552,10 +552,11 @@ local function describeEvent (event)
     return name, (#details > 0) and table.concat(details, ", ") or nil
   end
 
-  -- A transfer says where it went; anything else falls back to Bitvavo's own type name, which
-  -- is what someone reconciling against a Bitvavo export looks for. An unknown type gets
-  -- neither, because the name already is that term.
-  return label, transfer or (known and tostring(eventType) or nil)
+  -- The purpose stays empty unless it carries something the name does not. Bitvavo's own type
+  -- name was in here as an aid to reconciling against a Bitvavo export, and it earned its place
+  -- badly: next to "Rückvergütung" it says "rebate", which is the same word in the other
+  -- language, and it was the only English string in a German column.
+  return label, transfer
 end
 
 -- Fetches every page of /v2/account/history and returns the events as one flat list.
