@@ -1,6 +1,9 @@
 -- Unofficial Bitvavo Extension (https://bitvavo.com) for MoneyMoney
--- Fetches crypto and EUR balances and lists each asset with its current EUR price.
--- MoneyMoney has no account type for crypto, so the account appears as a portfolio.
+-- Fetches the crypto holdings and the EUR cash balance from a Bitvavo account.
+--
+-- Two accounts, because the two halves want different things from MoneyMoney. MoneyMoney has no
+-- account type for crypto, so the holdings appear as a portfolio, priced in EUR. The EUR cash
+-- sits in a giro account, where it can carry the transactions that a portfolio cannot show.
 --
 -- Covers everything the API exposes as a holding: available, bound in open orders, and fixed
 -- staking. Flex staking needs no special handling - those assets stay tradable and are part of
@@ -22,6 +25,11 @@
 -- https://github.com/GordonSeipold/MoneyMoney-Bitvavo
 
 local BANK_CODE  = "Bitvavo"
+
+-- The portfolio keeps the number it has always had: changing it would orphan the account and
+-- its history in an existing MoneyMoney database. The cash account is new and gets its own.
+local PORTFOLIO_ACCOUNT = "Bitvavo"
+local CASH_ACCOUNT      = "Bitvavo-EUR"
 local API_HOST   = "https://api.bitvavo.com"
 local API_PREFIX = "/v2"
 
@@ -36,7 +44,7 @@ local ASSET_NAME_TTL = 7 * 24 * 60 * 60
 WebBanking{
   -- MAJOR.NN, two decimals - the resolution MoneyMoney prints in the protocol window. 1.00 is
   -- the first published release; every change after it increments the last position.
-  version  = 1.01,
+  version  = 1.10,
   url      = "https://bitvavo.com",
   services = { BANK_CODE },
   -- Observed on the account dialog: MoneyMoney displays none of this, and offers no way to
@@ -49,11 +57,14 @@ local apiKey
 local apiSecret
 local connection
 
--- The /balance response from the login check. MoneyMoney runs InitializeSession2 on every
--- refresh cycle, not only when the account is added, so fetching it again in RefreshAccount
--- would mean asking for the same data twice per refresh - and /balance is the most expensive
--- call in the set at 5 rate-limit points. It is consumed once and then discarded.
-local loginBalances
+-- The /balance response from the login check, kept for the whole session.
+--
+-- MoneyMoney runs InitializeSession2 once per refresh cycle and then RefreshAccount once per
+-- account - twice here, for the portfolio and for the cash account. Both need the same balance,
+-- and it is the most expensive call in the set at 5 rate-limit points. Session-scoped is
+-- therefore right: fresh every cycle, fetched once within it.
+local sessionBalances
+
 
 function SupportsBank (protocol, bankCode)
   return protocol == ProtocolWebBanking and bankCode == BANK_CODE
@@ -196,20 +207,30 @@ function InitializeSession2 (protocol, bankCode, step, credentials, interactive)
     return describeError(err)
   end
 
-  loginBalances = balances
+  sessionBalances = balances
   print("Bitvavo: Anmeldung erfolgreich.")
 end
 
 function ListAccounts (knownAccounts)
   return {
     {
-      name = BANK_CODE,
-      -- A constant, deliberately not derived from the API key: rotating the key must not
-      -- orphan the account and its history in MoneyMoney.
-      accountNumber = "Bitvavo",
+      -- The names are what MoneyMoney shows; the numbers are what it keys on. Renaming is
+      -- therefore free, and "Depot" and "Verrechnungskonto" are what a German statement calls
+      -- these two - the holdings, and the cash account that settles them.
+      name = BANK_CODE .. " Depot",
+      accountNumber = PORTFOLIO_ACCOUNT,
       currency = "EUR",
       portfolio = true,
       type = AccountTypePortfolio
+    },
+    {
+      -- EUR moved out of the portfolio and into an account of its own. It cannot be in both:
+      -- a cash balance plus a Euro position would count the same money twice.
+      name = BANK_CODE .. " Verrechnungskonto",
+      accountNumber = CASH_ACCOUNT,
+      currency = "EUR",
+      portfolio = false,
+      type = AccountTypeGiro
     }
   }
 end
@@ -273,9 +294,6 @@ end
 -- USDC-EUR rate, never at an assumed 1:1 peg. An asset with no route to EUR returns nil and
 -- is shown unpriced, because no value is honest where an invented one would not be.
 local function priceInEur (symbol, prices)
-  if symbol == "EUR" then
-    return 1.0
-  end
 
   local direct = prices[symbol .. "-EUR"]
   if direct ~= nil and direct > 0 then
@@ -315,6 +333,20 @@ local function addPosition (securities, unpriced, symbol, quantity, names, price
   }
 end
 
+-- The balance from the login check if this cycle already has it, otherwise a fresh call.
+local function fetchBalances ()
+  if sessionBalances ~= nil then
+    return sessionBalances
+  end
+
+  local balances, err = requestPrivate("/balance")
+  if balances == nil then
+    error(describeError(err))
+  end
+  sessionBalances = balances
+  return balances
+end
+
 -- Assets locked in fixed staking. Bitvavo excludes them from /balance, so without this call a
 -- portfolio that stakes is reported too low - silently, which is the one outcome worth failing
 -- over. An account that stakes nothing gets an empty array, not an error; verified live.
@@ -326,20 +358,384 @@ local function fetchStakingBalance ()
   return response
 end
 
-function RefreshAccount (account, since)
-  MM.printStatus(MM.localizeText("Fetching balances"))
+-- ---------------------------------------------------------------------------
+-- Account history - the cash account's transactions
+-- ---------------------------------------------------------------------------
 
-  -- The login check fetched this moments ago in the same cycle. Consume it once, so a second
-  -- refresh in the same session still asks for fresh numbers.
-  local balances = loginBalances
-  loginBalances = nil
-  if balances == nil then
-    local err
-    balances, err = requestPrivate("/balance")
-    if balances == nil then
-      error(describeError(err))
+-- Bitvavo pages this endpoint. 100 keeps the number of round trips low without asking for a
+-- response so large that a slow connection times out.
+local HISTORY_PAGE_SIZE = 100
+
+-- Guards against an endless loop should totalPages ever misbehave. 200 pages at 100 items is
+-- 20000 events - far beyond any private account.
+local HISTORY_PAGE_LIMIT = 200
+
+-- executedAt is ISO 8601 in UTC ("2026-08-17T03:23:57.215Z"), while MoneyMoney wants POSIX
+-- seconds. os.time reads its table as local time, so the offset has to be added back.
+local function parseIsoTimestamp (iso)
+  if type(iso) ~= "string" then
+    return nil
+  end
+
+  local year, month, day, hour, minute, second =
+    iso:match("^(%d+)-(%d+)-(%d+)T(%d+):(%d+):(%d+)")
+  if year == nil then
+    return nil
+  end
+
+  local asLocal = os.time({
+    year = tonumber(year), month = tonumber(month), day = tonumber(day),
+    hour = tonumber(hour), min = tonumber(minute), sec = tonumber(second),
+    isdst = false
+  })
+  if asLocal == nil then
+    return nil
+  end
+
+  return asLocal + os.difftime(asLocal, os.time(os.date("!*t", asLocal)))
+end
+
+-- How much EUR an event moved, fees included, positive for money in.
+--
+-- Deliberately computed from the currency fields rather than from the event type. Bitvavo
+-- documents fourteen types and adds to them; a table of known types would silently drop the
+-- unfamiliar ones, and the running balance would be wrong without anything looking wrong. An
+-- event that moved no EUR returns 0 and is not a cash booking at all - a crypto withdrawal, for
+-- instance, or a swap between two coins.
+local function currencyEffect (event, currency)
+  local total = 0.0
+
+  if event["receivedCurrency"] == currency then
+    total = total + (tonumber(event["receivedAmount"]) or 0)
+  end
+  if event["sentCurrency"] == currency then
+    total = total - (tonumber(event["sentAmount"]) or 0)
+  end
+  -- A rebate carries no fee fields at all, so nothing here may be assumed present.
+  if event["feesCurrency"] == currency then
+    total = total - (tonumber(event["feesAmount"]) or 0)
+  end
+
+  return total
+end
+
+local function eurEffect (event)
+  return currencyEffect(event, "EUR")
+end
+
+-- The one asset an event moved, or nil where none did. A trade touches exactly one besides EUR,
+-- and a coin-to-coin swap - two of them - is deliberately not represented: it is one event, and
+-- MoneyMoney has no booking that is two amounts in two currencies.
+local function movedAsset (event)
+  for _, field in ipairs({ "receivedCurrency", "sentCurrency" }) do
+    local currency = event[field]
+    if type(currency) == "string" and currency ~= "" and currency ~= "EUR" then
+      return currency
     end
   end
+  return nil
+end
+
+-- Same principle as the error codes: translate where it helps, fall back to what Bitvavo says.
+local EVENT_LABEL = {
+  buy        = "Kauf",
+  sell       = "Verkauf",
+  deposit    = "Einzahlung",
+  withdrawal = "Auszahlung",
+  rebate     = "Rückvergütung",
+  staking    = "Staking-Ertrag",
+  fixed_staking = "Staking-Ertrag (fest)"
+}
+
+-- Bitvavo writes its type names in snake case. An unknown one ends up in the name column of a
+-- statement, where "campaign_new_user_incentive" reads as machine output that escaped. Seen
+-- live: that exact type, for a new-customer credit that no documentation lists.
+local function humaniseType (rawType)
+  local text = tostring(rawType):gsub("_", " ")
+  return (text:gsub("^%l", string.upper))
+end
+
+-- Formats a number the way a German statement reads, with a comma for the decimal mark.
+--
+-- EUR gets two decimals because that is what money looks like - unless two decimals would round
+-- a real amount down to zero. A coin trading below a cent is exactly that case, and "0,00" in a
+-- price would be a lie rather than a rounding. Quantities keep up to eight decimals with the
+-- trailing zeros trimmed, so a whole number is not padded with noise.
+-- Groups the integer part in threes, German style: 54676 -> 54.676. A rate in the tens of
+-- thousands is the normal case here, and an ungrouped one has to be counted rather than read.
+local function groupThousands (digits)
+  local reversed = digits:reverse():gsub("(%d%d%d)", "%1.")
+  local grouped = reversed:reverse()
+  return (grouped:gsub("^%.", ""))
+end
+
+local function formatNumber (value, currency)
+  local number = tonumber(value)
+  if number == nil then
+    return nil
+  end
+
+  local text
+  if currency == "EUR" and math.abs(number) >= 0.005 then
+    text = string.format("%.2f", number)
+  else
+    text = string.format("%.8f", number)
+    text = text:gsub("0+$", "")
+    text = text:gsub("%.$", "")
+  end
+
+  local sign, whole, fraction = text:match("^(%-?)(%d+)%.?(%d*)$")
+  if whole == nil then
+    return (text:gsub("%.", ","))
+  end
+
+  local formatted = sign .. groupThousands(whole)
+  if fraction ~= "" then
+    formatted = formatted .. "," .. fraction
+  end
+  return formatted
+end
+
+-- Returns the two strings MoneyMoney shows for a booking: its name and its purpose line.
+--
+-- A trade names the quantity and the asset, with the rate and any fee behind it. "Kauf" on its
+-- own is an amount without a story, and the rate is the one number a statement cannot
+-- reconstruct later once the market has moved.
+--
+-- Everything else carries Bitvavo's own type in the purpose, which is what someone comparing
+-- this against a Bitvavo export needs. The exception is a type this extension does not know:
+-- there the name already is that term, so repeating it would only fill the column twice.
+-- Bitvavo calls both of these "withdrawal": euro sent to a bank account, and a coin sent to a
+-- wallet the customer controls. They are not the same event. The first leaves the relationship;
+-- the second moves the same holding into the customer's own custody, and nothing was spent.
+-- Labelling both "Auszahlung" reads as if the coins had been cashed out.
+--
+-- "Übertragung" says what happened without implying either. The direction is not in the word
+-- because it does not need to be: the purpose line names the other side as "An ..." or
+-- "Von ...", and one label for both directions is what lets a statement group them.
+local ASSET_EVENT_LABEL = {
+  deposit    = "Übertragung",
+  withdrawal = "Übertragung"
+}
+
+local function describeEvent (event)
+  local eventType = event["type"]
+  local label = EVENT_LABEL[eventType] or humaniseType(eventType)
+
+  -- On a buy the asset arrives and EUR leaves; on a sell, and on a transfer out, the reverse.
+  local asset = movedAsset(event)
+  local quantity = nil
+  if asset ~= nil then
+    quantity = (asset == event["receivedCurrency"]) and event["receivedAmount"]
+               or event["sentAmount"]
+  end
+
+  -- Where the money came from or went to. Present on transfers, null on everything else.
+  --
+  -- Read from /account/history rather than from /depositHistory, which carries the same field
+  -- unmasked. Bitvavo shortens a bank account to "DE80***00" here, and that is the better
+  -- value: it names the source unambiguously for anyone who owns the account, and it keeps a
+  -- full IBAN out of MoneyMoney's database. The direction follows the currency fields, not the
+  -- event type, for the same reason the amount does - an unfamiliar transfer type still reads
+  -- correctly.
+  local address = event["address"]
+  local transfer = nil
+  if type(address) == "string" and address ~= "" then
+    if event["receivedCurrency"] ~= nil and event["sentCurrency"] == nil then
+      transfer = "Von " .. address
+    elseif event["sentCurrency"] ~= nil and event["receivedCurrency"] == nil then
+      transfer = "An " .. address
+    end
+  end
+
+  -- The name is a category, not a description of this one booking. "Kauf BTC" is the same
+  -- string on every Bitcoin purchase, so a statement groups by it, a search finds all of them,
+  -- and a MoneyMoney rule can match it. "Kauf 0,00456086 BTC" is unique to a single row and
+  -- defeats all three. The quantity belongs in the purpose, where being unique costs nothing.
+  --
+  -- The purpose leads with the quantity and puts the rest in brackets behind it, because the
+  -- quantity is the fact and the rate and the fee qualify it. A euro amount is never repeated
+  -- there - it is already in its own column, and saying it twice is how the column stops being
+  -- read.
+  local details = {}
+  if transfer ~= nil then
+    details[#details + 1] = transfer
+  end
+
+  if eventType == "buy" or eventType == "sell" then
+    local rate = formatNumber(event["priceAmount"], event["priceCurrency"])
+    if rate ~= nil and event["priceCurrency"] ~= nil then
+      details[#details + 1] = "Kurs " .. rate .. " " .. event["priceCurrency"]
+    end
+  end
+
+  local fee = tonumber(event["feesAmount"])
+  if fee ~= nil and fee > 0 and event["feesCurrency"] ~= nil then
+    details[#details + 1] =
+      "Gebühr " .. formatNumber(fee, event["feesCurrency"]) .. " " .. event["feesCurrency"]
+  end
+
+  if asset ~= nil then
+    -- asset is never EUR here, so a transfer label applies whenever one exists for the type.
+    label = ASSET_EVENT_LABEL[eventType] or label
+
+    local moved = formatNumber(quantity, asset)
+    local name = label .. " " .. asset
+    local head = moved and (moved .. " " .. asset) or nil
+
+    if head == nil then
+      return name, (#details > 0) and table.concat(details, ", ") or nil
+    end
+    if #details == 0 then
+      return name, head
+    end
+    return name, head .. " (" .. table.concat(details, ", ") .. ")"
+  end
+
+  -- No asset involved: a plain euro movement. The purpose stays empty unless it carries
+  -- something the name does not - the source of a deposit, say. Bitvavo's own type name was in
+  -- here once and earned its place badly: next to "Rückvergütung" it printed "rebate", the same
+  -- word in the other language, and it was the only English string in a German column.
+  return label, (#details > 0) and table.concat(details, ", ") or nil
+end
+
+-- Fetches /v2/account/history and returns the events as one flat list.
+--
+-- The range is narrowed server side with fromDate, so a refresh asks for what happened since
+-- MoneyMoney last looked instead of for everything. Without it an account with ten thousand
+-- events would page through all hundred pages on every single refresh, and the cost would grow
+-- with the account's age forever. A first sync has no cut-off and does read everything, once.
+--
+-- Deliberately not narrowed by type. The endpoint offers that filter and its enumeration is the
+-- same fourteen types Bitvavo documents - which a live account was already found to exceed. A
+-- type filter would have dropped a real credit of 20 EUR at the server, where nothing in the
+-- response could hint that anything was missing.
+local function fetchAccountHistory (since)
+  local events = {}
+  local page = 1
+
+  -- Milliseconds, and an integer: "%d" because Lua would otherwise render a float and Bitvavo
+  -- would reject it. fromDate is inclusive where the filter below is strict, so an event landing
+  -- exactly on the cut-off is fetched and then dropped - the two are not redundant, they draw
+  -- the boundary at different sharpness.
+  local range = ""
+  if since ~= nil then
+    range = string.format("&fromDate=%d", math.floor(since) * 1000)
+  end
+
+  repeat
+    local response, err = requestPrivate(string.format(
+      "/account/history?page=%d&maxItems=%d%s", page, HISTORY_PAGE_SIZE, range))
+    if response == nil then
+      error(describeError(err))
+    end
+
+    local items = response["items"]
+    if type(items) ~= "table" then
+      error(MM.localizeText(
+        "Bitvavo returned an account history in an unexpected format. The API may have changed; " ..
+        "please report this at https://github.com/GordonSeipold/MoneyMoney-Bitvavo/issues"))
+    end
+
+    for _, event in pairs(items) do
+      if type(event) == "table" then
+        events[#events + 1] = event
+      end
+    end
+
+    local totalPages = tonumber(response["totalPages"]) or 1
+    page = page + 1
+  until page > totalPages or page > HISTORY_PAGE_LIMIT
+
+  return events
+end
+
+-- Turns the event list into MoneyMoney transactions for a cash account.
+--
+-- Events at or before "since" are dropped. MoneyMoney passes the point from which it wants
+-- transactions, and whether it discards a repeat of something it already stored is not
+-- documented anywhere we could find. Honouring the cut-off is the only behaviour that is
+-- correct either way: if MoneyMoney does deduplicate, nothing is lost by sending less, and if
+-- it does not, this is what keeps every refresh from stacking the whole history on top of
+-- itself. No overlap margin for the same reason - an overlap is only free under the assumption
+-- we are declining to make. A nil since means a first sync and everything is sent.
+--
+-- The cut-off filters rather than stopping the paging early, because Bitvavo does not document
+-- an ordering for /account/history. Observed responses are newest first, but breaking out of
+-- the loop on that basis would drop events if it ever came back unsorted, and the endpoint is
+-- cheap enough at one rate-limit point per page that reading all of it costs nothing worth
+-- having.
+local function buildCashTransactions (events, since)
+  local transactions = {}
+
+  for _, event in pairs(events) do
+    local amount = eurEffect(event)
+
+    -- A coin that moved without costing anything - sent to a private wallet, arrived from one -
+    -- is booked at zero rather than dropped. Otherwise the coins simply stop appearing in the
+    -- portfolio one day with nothing anywhere to say where they went, and the statement shows
+    -- two purchases where the portfolio holds one. Zero leaves the balance untouched, so the
+    -- reconciliation still holds; the line exists to carry its name and its address.
+    if amount ~= 0 or movedAsset(event) ~= nil then
+      local bookingDate = parseIsoTimestamp(event["executedAt"])
+      if bookingDate == nil then
+        error(MM.localizeText(
+          "Bitvavo returned an account history entry without a usable date. The API may have " ..
+          "changed; please report this at " ..
+          "https://github.com/GordonSeipold/MoneyMoney-Bitvavo/issues"))
+      end
+
+      if since == nil or bookingDate > since then
+        local name, purpose = describeEvent(event)
+
+        transactions[#transactions + 1] = {
+          name = name,
+          amount = amount,
+          currency = "EUR",
+          bookingDate = bookingDate,
+          purpose = purpose,
+          -- Not transactionCode: MoneyMoney wants an integer there and rejects Bitvavo's UUID
+          -- with a warning per booking. It deduplicates without any help from us - a refresh
+          -- that returns two known bookings reports "0 are new" - but that match is on the
+          -- visible fields, so two identical amounts on one day would collapse into one. The
+          -- reference is what keeps them apart.
+          endToEndReference = tostring(event["transactionId"]),
+          booked = true
+        }
+      end
+    end
+  end
+
+  return transactions
+end
+
+-- The cash account: EUR balance plus every event that moved EUR.
+local function refreshCashAccount (since)
+  MM.printStatus(MM.localizeText("Fetching balances"))
+  local balances = fetchBalances()
+
+  local balance = 0.0
+  for _, entry in pairs(balances) do
+    if type(entry) == "table" and entry["symbol"] == "EUR" then
+      balance = (tonumber(entry["available"]) or 0) + (tonumber(entry["inOrder"]) or 0)
+    end
+  end
+
+  MM.printStatus(MM.localizeText("Fetching transactions"))
+  return {
+    balance = balance,
+    transactions = buildCashTransactions(fetchAccountHistory(since), since)
+  }
+end
+
+function RefreshAccount (account, since)
+  if account["accountNumber"] == CASH_ACCOUNT then
+    return refreshCashAccount(since)
+  end
+
+  MM.printStatus(MM.localizeText("Fetching balances"))
+
+  local balances = fetchBalances()
 
   local staked = fetchStakingBalance()
 
@@ -363,7 +759,10 @@ function RefreshAccount (account, since)
         "please report this at https://github.com/GordonSeipold/MoneyMoney-Bitvavo/issues"))
     end
 
-    addPosition(securities, unpriced, symbol, available + inOrder, names, prices)
+    -- EUR is the cash account now, not a position.
+    if symbol ~= "EUR" then
+      addPosition(securities, unpriced, symbol, available + inOrder, names, prices)
+    end
   end
 
   -- Locked positions are listed separately rather than added to the tradable one. Merging them
@@ -387,10 +786,14 @@ function RefreshAccount (account, since)
       table.concat(unpriced, ", ")))
   end
 
+  -- Positions only. MoneyMoney ignores transactions on an account of type AccountTypePortfolio:
+  -- returning three of them alongside the securities produced no list and no error, verified
+  -- live on 2026-08-17. A coin movement is therefore recorded on the cash account instead.
   return { securities = securities }
 end
 
 function EndSession ()
+  sessionBalances = nil
   if connection ~= nil then
     connection:close()
     connection = nil

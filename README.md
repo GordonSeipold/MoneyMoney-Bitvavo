@@ -1,15 +1,37 @@
 # MoneyMoney Extension für Bitvavo
 
-Diese Web Banking Extension für [MoneyMoney](https://moneymoney.app) ruft Ihre Bestände bei [Bitvavo](https://bitvavo.com) ab und zeigt jedes Asset als Position mit aktuellem Kurs in EUR.
+Diese Web Banking Extension für [MoneyMoney](https://moneymoney.app) ruft Ihre Bestände und Ihre Umsätze bei [Bitvavo](https://bitvavo.com) ab.
 
 > Bitte beachten Sie: Weder Bitvavo noch MoneyMoney leisten für diese Extension Support oder sind an diesem Projekt beteiligt.
 
 ## Funktionsumfang
 
-- Listet jedes gehaltene Asset als Position, jeweils mit vollem Namen ("Bitcoin" statt "BTC")
-- Bewertet jede Position mit dem Kurs von Bitvavo selbst, nicht über einen fremden Kursdienst
-- Zeigt auch Ihren EUR-Bestand als Position, damit die Gesamtsumme vollständig ist
-- In MoneyMoney erscheint das Konto als Wertpapierdepot; einen eigenen Kontotyp für Krypto gibt es dort nicht
+Die Extension legt in MoneyMoney **zwei Konten** an:
+
+| Konto | Zeigt |
+|---|---|
+| **Bitvavo Depot** | jedes gehaltene Asset als Position, mit vollem Namen ("Bitcoin" statt "BTC") und dem aktuellen Kurs von Bitvavo selbst, nicht über einen fremden Kursdienst |
+| **Bitvavo Verrechnungskonto** | Ihr EUR-Guthaben mit allen Buchungen: Ein- und Auszahlungen, Käufe, Verkäufe, Prämien |
+
+Ein eigener Kontotyp für Krypto existiert in MoneyMoney nicht, deshalb erscheint das Depot als Wertpapierdepot und das Verrechnungskonto als Girokonto.
+
+Die Trennung hat einen Grund: Ein Depot zeigt Bestände, keine Bewegungen. Erst das Verrechnungskonto macht sichtbar, wie ein Bestand zustande gekommen ist. Ihr EUR-Guthaben steht ausschließlich dort und nicht zusätzlich als Position im Depot – sonst wäre dasselbe Geld doppelt gezählt.
+
+### Was in den Buchungen steht
+
+Jede Buchung nennt im Titel die Art des Vorgangs und in der Beschreibung die Einzelheiten:
+
+| Buchung | Beschreibung |
+|---|---|
+| `Kauf BTC` | `0,00456086 BTC (Kurs 54.676,00 EUR, Gebühr 0,63 EUR)` |
+| `Einzahlung` | `Von DE80***00` – Ihre Bankverbindung, wie Bitvavo sie verkürzt zurückgibt |
+| `Übertragung BTC` | `0,00033876 BTC (An bc1q…, Gebühr 0,000023 BTC)` |
+
+Der Kurs steht dort, weil er sich später aus nichts mehr rekonstruieren lässt, sobald der Markt weitergelaufen ist.
+
+Ein Coin, der zwischen Bitvavo und einer Wallet wechselt, heißt **Übertragung** und nicht Auszahlung – Sie haben nichts entnommen, der Bestand ist nur in eine andere Verwahrung gewechselt. Wohin oder woher, steht in der Beschreibung. „Ein-" und „Auszahlung" bleiben dem vorbehalten, was tatsächlich als Geld zwischen Ihrem Bankkonto und Bitvavo fließt.
+
+**Auch Vorgänge, die kein EUR bewegen, werden gebucht** – etwa eine Übertragung an Ihre eigene Wallet. Sie erscheinen mit dem Betrag 0,00 EUR und ändern den Kontostand nicht. Ohne sie würden Coins eines Tages einfach nicht mehr im Depot stehen, ohne dass irgendwo steht, wohin sie gegangen sind.
 
 ### Welche Bestände enthalten sind
 
@@ -27,7 +49,8 @@ Für eine feste Frist gesperrte Bestände werden bewusst nicht zur handelbaren P
 
 ### Einschränkungen
 
-- **Nur aktuelle Bestände.** Ein- und Auszahlungen sowie Trades werden nicht importiert.
+- **Das Depot zeigt keine Bewegungen.** MoneyMoney stellt bei einem Wertpapierdepot ausschließlich Bestände dar. Was mit einem Coin geschehen ist, steht deshalb im Verrechnungskonto.
+- **Tausch zwischen zwei Kryptowährungen erscheint nicht als eigene Buchung.** Ein solcher Vorgang bewegt zwei Coins gleichzeitig, und eine Buchung hat genau einen Betrag in genau einer Währung. Die Bestände im Depot stimmen danach trotzdem.
 - **Einige Assets sind bei Bitvavo vom Handel ausgeschlossen und haben keinen Kurs.** Solche Bestände werden mit ihrer Stückzahl, aber ohne Wert angezeigt – statt mit einem erfundenen Kurs. Das Protokollfenster von MoneyMoney (*Fenster → Protokoll*) nennt jedes betroffene Asset. Welche Kryptowährungen handelbar sind, zeigt die [Marktübersicht von Bitvavo](https://bitvavo.com/de/markets).
 
 ## Voraussetzungen
