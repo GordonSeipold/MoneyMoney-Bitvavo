@@ -64,9 +64,9 @@ Diese Web Banking Extension für [MoneyMoney](https://moneymoney.app) ruft Ihre 
 | Feld | Wert |
 |---|---|
 | Benutzername | Ihr Bitvavo-**API-Schlüssel** |
-| Kennwort | Ihr Bitvavo-**API-Secret** |
+| Passwort | Ihr Bitvavo-**API-Secret** |
 
-MoneyMoney erlaubt Extensions nicht, diese beiden Felder umzubenennen – sie behalten daher ihre Standardbezeichnungen. **Kennwort sichern** ankreuzen, sonst wird das 64-stellige Secret bei jeder Aktualisierung erneut abgefragt.
+MoneyMoney erlaubt Extensions nicht, diese beiden Felder umzubenennen – sie behalten daher ihre Standardbezeichnungen. **Passwort speichern** ankreuzen, sonst wird das Secret bei jeder Aktualisierung erneut abgefragt.
 
 Beim ersten Verbindungsaufbau fragt MoneyMoney nach der Bestätigung des SSL-Zertifikats für `api.bitvavo.com`. Das ist bei einem noch unbekannten Server normal.
 
