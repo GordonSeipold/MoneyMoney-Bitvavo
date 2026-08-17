@@ -14,17 +14,19 @@ Diese Web Banking Extension für [MoneyMoney](https://moneymoney.app) ruft Ihre 
 - Zeigt auch Ihren EUR-Bestand als Position, damit die Gesamtsumme vollständig ist
 - In MoneyMoney erscheint das Konto als Wertpapierdepot; einen eigenen Kontotyp für Krypto gibt es dort nicht
 
-### Welche Bestände erfasst werden
+### Welche Bestände enthalten sind
 
-| Bestandsart | Erfasst | Wie |
-|---|---|---|
-| Frei verfügbar | ja | Kontostand |
-| In offenen Orders gebunden | ja | Kontostand |
-| Flex Staking | ja | bleibt bei Bitvavo jederzeit handelbar und zählt deshalb zum Kontostand |
-| Lending | ja | ebenso – verliehene Bestände lassen sich jederzeit verkaufen oder auszahlen |
-| Fixed Staking | ja | wird gesondert abgefragt und als eigene Position mit dem Zusatz `(Fixed Staking)` angezeigt |
+**Alle.** Was Bitvavo als Bestand führt, taucht in MoneyMoney auf – auch das, was Sie über den Earn-Bereich angelegt haben. Unterschiedlich ist nur, *wo* es erscheint:
 
-Gesperrte Bestände werden bewusst **nicht** mit den handelbaren zusammengezählt. Die Summe wäre zwar richtig, würde aber verbergen, dass ein Teil davon nicht verkauft werden kann.
+| Bestandsart | Erscheint |
+|---|---|
+| Frei verfügbar | in der Position des Assets |
+| In offenen Orders gebunden | in derselben Position |
+| Flex Staking | in derselben Position – flexibel gestakte Bestände bleiben handelbar |
+| Lending | in derselben Position – verliehene Bestände bleiben verkäuflich |
+| **Fixed Staking** | **als eigene Position** mit dem Zusatz `(Fixed Staking)` |
+
+Fixed Staking fällt heraus, weil diese Bestände für eine feste Frist gesperrt sind. Sie werden bewusst nicht zur handelbaren Position addiert: Die Gesamtsumme wäre zwar richtig, würde aber verbergen, dass ein Teil davon vorerst nicht verkauft werden kann.
 
 ### Einschränkungen
 
