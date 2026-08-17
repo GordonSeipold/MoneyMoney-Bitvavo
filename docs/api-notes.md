@@ -219,6 +219,34 @@ Two things the documentation does not say, both confirmed against a live account
 A locked amount is listed as its own position rather than added to the tradable one. The total
 would be right either way, but merging would hide that part of it cannot be sold.
 
+### `GET /v2/account/history` – private, not used **[verified – live, 2026-08-17]**
+
+Weight 1. Returns every account event in one paginated call, which makes the separate history
+endpoints largely redundant.
+
+```json
+{ "items": [ ... ], "currentPage": 1, "totalPages": 2, "maxItems": 5 }
+```
+
+- **A `View access` key is enough.** Confirmed against a live account, including `buy` events.
+  Bitvavo's permission note says order and trade information requires the Trade permission, but
+  that applies to the order endpoints, not to this one.
+- Event types documented: `sell`, `buy`, `staking`, `fixed_staking`, `deposit`, `withdrawal`,
+  `affiliate`, `distribution`, `internal_transfer`, `withdrawal_cancelled`, `rebate`, `loan`,
+  `external_transferred_funds`, `manually_assigned`.
+- **Fields differ per type.** `transactionId`, `executedAt`, `type` and `address` are always
+  present. A `buy` adds price, sent, received and fee fields; a `deposit` only received and fee;
+  a `withdrawal` only sent and fee; a `rebate` only received, with **no fee fields at all**.
+  Nothing may be assumed present.
+- `executedAt` is an ISO 8601 string, while `/v2/depositHistory` reports milliseconds since
+  epoch. Two time formats in one API.
+- The event stream reconciles to `/v2/balance` exactly, to the cent, when every type is counted -
+  including `rebate`, which is easy to overlook and was worth six cents on a nearly empty account.
+- `address` is masked here (`DE80***00`) but returned in full by `/v2/depositHistory`.
+
+Not used by this extension, which reports holdings only. Whether that should change is the
+subject of issue #2.
+
 ### Possible later additions **[unconfirmed]**
 
 - `GET /v2/depositHistory` – params `symbol`, `limit`, `start`, `end`
