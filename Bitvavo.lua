@@ -34,16 +34,15 @@ local ACCESS_WINDOW = "10000"
 local ASSET_NAME_TTL = 7 * 24 * 60 * 60
 
 WebBanking{
-  -- Pre-release. 1.0 is reserved for the first signed, published build; until then every
-  -- version handed over for testing gets the next 0.x, so the protocol window says which
-  -- build is actually loaded.
-  version  = 0.91,
+  -- MAJOR.NN, two decimals - the resolution MoneyMoney prints in the protocol window. 1.00 is
+  -- the first published release; every change after it increments the last position.
+  version  = 1.00,
   url      = "https://bitvavo.com",
   services = { BANK_CODE },
-  -- MoneyMoney gives an extension no way to rename the credential fields, so this description
-  -- is the only place in the UI that can say which value belongs in which field.
-  description = string.format(MM.localizeText("Fetch balances from %s"), BANK_CODE) .. " " ..
-    MM.localizeText("Enter the API key as user name and the API secret as password.")
+  -- Observed on the account dialog: MoneyMoney displays none of this, and offers no way to
+  -- rename the credential fields either. Which value belongs in which field can therefore only
+  -- be said in the README and in the header of this file.
+  description = string.format(MM.localizeText("Fetch balances from %s"), BANK_CODE)
 }
 
 local apiKey

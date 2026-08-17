@@ -8,13 +8,12 @@ Diese Web Banking Extension für [MoneyMoney](https://moneymoney.app) ruft Ihre 
 
 - Listet jedes gehaltene Asset als Position, jeweils mit vollem Namen ("Bitcoin" statt "BTC")
 - Bewertet jede Position mit dem Kurs von Bitvavo selbst, nicht über einen fremden Kursdienst
-- Berücksichtigt auch Bestände, die in offenen Orders gebunden sind, nicht nur frei verfügbare
 - Zeigt auch Ihren EUR-Bestand als Position, damit die Gesamtsumme vollständig ist
 - In MoneyMoney erscheint das Konto als Wertpapierdepot; einen eigenen Kontotyp für Krypto gibt es dort nicht
 
 ### Welche Bestände enthalten sind
 
-**Alle.** Was Bitvavo als Bestand führt, taucht in MoneyMoney auf – auch das, was Sie über den Earn-Bereich angelegt haben. Unterschiedlich ist nur, *wo* es erscheint:
+**Alle** – auch das, was Sie über den Earn-Bereich angelegt haben. Unterschiedlich ist nur, *wo* es erscheint:
 
 | Bestandsart | Erscheint |
 |---|---|
@@ -24,12 +23,12 @@ Diese Web Banking Extension für [MoneyMoney](https://moneymoney.app) ruft Ihre 
 | Lending | in derselben Position – verliehene Bestände bleiben verkäuflich |
 | **Fixed Staking** | **als eigene Position** mit dem Zusatz `(Fixed Staking)` |
 
-Fixed Staking fällt heraus, weil diese Bestände für eine feste Frist gesperrt sind. Sie werden bewusst nicht zur handelbaren Position addiert: Die Gesamtsumme wäre zwar richtig, würde aber verbergen, dass ein Teil davon vorerst nicht verkauft werden kann.
+Für eine feste Frist gesperrte Bestände werden bewusst nicht zur handelbaren Position addiert: Die Gesamtsumme wäre zwar richtig, würde aber verbergen, dass ein Teil davon vorerst nicht verkauft werden kann.
 
 ### Einschränkungen
 
 - **Nur aktuelle Bestände.** Ein- und Auszahlungen sowie Trades werden nicht importiert.
-- **Einige Assets sind bei Bitvavo vom Handel ausgeschlossen und haben keinen Kurs.** Solche Bestände werden mit ihrer Stückzahl, aber ohne Wert angezeigt – statt mit einem erfundenen Kurs. Das Protokollfenster von MoneyMoney (*Fenster → Protokoll*) nennt jedes betroffene Asset, sodass eine Position nie unbemerkt verschwindet. Welche Kryptowährungen handelbar sind, zeigt die [Marktübersicht von Bitvavo](https://bitvavo.com/de/markets).
+- **Einige Assets sind bei Bitvavo vom Handel ausgeschlossen und haben keinen Kurs.** Solche Bestände werden mit ihrer Stückzahl, aber ohne Wert angezeigt – statt mit einem erfundenen Kurs. Das Protokollfenster von MoneyMoney (*Fenster → Protokoll*) nennt jedes betroffene Asset. Welche Kryptowährungen handelbar sind, zeigt die [Marktübersicht von Bitvavo](https://bitvavo.com/de/markets).
 
 ## Voraussetzungen
 
@@ -74,16 +73,20 @@ Die Fassung aus dem Repository kann neuer sein als die signierte: Jede Version m
 | Benutzername | Ihr Bitvavo-**API-Schlüssel** |
 | Passwort | Ihr Bitvavo-**API-Secret** |
 
-MoneyMoney erlaubt Extensions nicht, diese beiden Felder umzubenennen – sie behalten daher ihre Standardbezeichnungen. **Passwort speichern** ankreuzen, sonst wird das Secret bei jeder Aktualisierung erneut abgefragt.
+**Passwort speichern** ankreuzen, sonst wird das Secret bei jeder Aktualisierung erneut abgefragt.
 
 Beim ersten Verbindungsaufbau fragt MoneyMoney nach der Bestätigung des SSL-Zertifikats für `api.bitvavo.com`. Das ist bei einem noch unbekannten Server normal.
 
-Schlägt die Anmeldung fehl, nennt die Extension den Grund im Klartext – etwa vertauschte Felder, ein unvollständiges Secret, eine fehlende Berechtigung oder eine IP-Adresse, die nicht auf der Whitelist des Schlüssels steht.
+Schlägt die Anmeldung fehl, meldet MoneyMoney den Grund im Klartext statt einer allgemeinen Fehlermeldung – etwa vertauschte Felder, ein unvollständiges Secret, eine fehlende Berechtigung oder eine IP-Adresse, die nicht auf der Whitelist des Schlüssels steht. Dieselbe Meldung steht auch im Protokollfenster (*Fenster → Protokoll*).
+
+## Rückmeldungen
+
+Fehler, Fragen und Verbesserungsvorschläge sind willkommen – am besten als [Issue](../../issues). Hilfreich ist die Ausgabe aus dem Protokollfenster (*Fenster → Protokoll*): Sie enthält keine Zugangsdaten, wohl aber die Meldung, an der es gescheitert ist.
 
 ## Sicherheit
 
 - **Nur lesender Zugriff.** Die Extension stellt ausschließlich Leseanfragen. Sie erteilt niemals eine Order, bewegt keine Bestände und ändert keine Einstellung.
-- **Nichts geht an Dritte.** Die Extension spricht ausschließlich mit `api.bitvavo.com`. Ins Protokollfenster schreibt sie, wie viele Zeichen Sie in die beiden Felder eingetragen haben – nie deren Inhalt – sowie die Namen von Assets ohne Kurs. Das hilft bei der Fehlersuche und bleibt auf Ihrem Rechner.
+- **Nichts geht an Dritte.** Die Extension spricht ausschließlich mit `api.bitvavo.com`. Ins Protokollfenster schreibt sie zur Fehlersuche, wie viele Zeichen Sie in die beiden Felder eingetragen haben – nie deren Inhalt – sowie die Namen von Assets ohne Kurs. Das bleibt auf Ihrem Rechner.
 
 ## KI-Unterstützung
 
