@@ -44,7 +44,7 @@ local ASSET_NAME_TTL = 7 * 24 * 60 * 60
 WebBanking{
   -- MAJOR.NN, two decimals - the resolution MoneyMoney prints in the protocol window. 1.00 is
   -- the first published release; every change after it increments the last position.
-  version  = 1.06,
+  version  = 1.07,
   url      = "https://bitvavo.com",
   services = { BANK_CODE },
   -- Observed on the account dialog: MoneyMoney displays none of this, and offers no way to
@@ -463,20 +463,39 @@ end
 -- a real amount down to zero. A coin trading below a cent is exactly that case, and "0,00" in a
 -- price would be a lie rather than a rounding. Quantities keep up to eight decimals with the
 -- trailing zeros trimmed, so a whole number is not padded with noise.
+-- Groups the integer part in threes, German style: 54676 -> 54.676. A rate in the tens of
+-- thousands is the normal case here, and an ungrouped one has to be counted rather than read.
+local function groupThousands (digits)
+  local reversed = digits:reverse():gsub("(%d%d%d)", "%1.")
+  local grouped = reversed:reverse()
+  return (grouped:gsub("^%.", ""))
+end
+
 local function formatNumber (value, currency)
   local number = tonumber(value)
   if number == nil then
     return nil
   end
 
+  local text
   if currency == "EUR" and math.abs(number) >= 0.005 then
-    return (string.format("%.2f", number):gsub("%.", ","))
+    text = string.format("%.2f", number)
+  else
+    text = string.format("%.8f", number)
+    text = text:gsub("0+$", "")
+    text = text:gsub("%.$", "")
   end
 
-  local text = string.format("%.8f", number)
-  text = text:gsub("0+$", "")
-  text = text:gsub("%.$", "")
-  return (text:gsub("%.", ","))
+  local sign, whole, fraction = text:match("^(%-?)(%d+)%.?(%d*)$")
+  if whole == nil then
+    return (text:gsub("%.", ","))
+  end
+
+  local formatted = sign .. groupThousands(whole)
+  if fraction ~= "" then
+    formatted = formatted .. "," .. fraction
+  end
+  return formatted
 end
 
 -- Returns the two strings MoneyMoney shows for a booking: its name and its purpose line.
@@ -519,44 +538,52 @@ local function describeEvent (event)
     end
   end
 
-  -- A euro amount is already in its own column; naming it again would say it twice. A coin
-  -- amount is nowhere else, so it goes in the name - "Auszahlung 0,00033876 BTC" says what left,
-  -- where "Auszahlung" alone says only that something did.
+  -- The name is a category, not a description of this one booking. "Kauf BTC" is the same
+  -- string on every Bitcoin purchase, so a statement groups by it, a search finds all of them,
+  -- and a MoneyMoney rule can match it. "Kauf 0,00456086 BTC" is unique to a single row and
+  -- defeats all three. The quantity belongs in the purpose, where being unique costs nothing.
   --
-  -- The name states what was moved, the booking amount what the move cost in total, and the gap
-  -- between the two is the fee, which is why the fee is always named. A line whose text says one
-  -- number and whose amount column says another, with nothing to explain the difference, is a
-  -- line that will be read as a bug.
-  if asset ~= nil then
-    local moved = formatNumber(quantity, asset)
-    local name = label .. " " .. (moved and (moved .. " ") or "") .. asset
-
-    local details = {}
-    if transfer ~= nil then
-      details[#details + 1] = transfer
-    end
-
-    if eventType == "buy" or eventType == "sell" then
-      local rate = formatNumber(event["priceAmount"], event["priceCurrency"])
-      if rate ~= nil and event["priceCurrency"] ~= nil then
-        details[#details + 1] = "Kurs " .. rate .. " " .. event["priceCurrency"]
-      end
-    end
-
-    local fee = tonumber(event["feesAmount"])
-    if fee ~= nil and fee > 0 and event["feesCurrency"] ~= nil then
-      details[#details + 1] =
-        "Gebühr " .. formatNumber(fee, event["feesCurrency"]) .. " " .. event["feesCurrency"]
-    end
-
-    return name, (#details > 0) and table.concat(details, ", ") or nil
+  -- The purpose leads with the quantity and puts the rest in brackets behind it, because the
+  -- quantity is the fact and the rate and the fee qualify it. A euro amount is never repeated
+  -- there - it is already in its own column, and saying it twice is how the column stops being
+  -- read.
+  local details = {}
+  if transfer ~= nil then
+    details[#details + 1] = transfer
   end
 
-  -- The purpose stays empty unless it carries something the name does not. Bitvavo's own type
-  -- name was in here as an aid to reconciling against a Bitvavo export, and it earned its place
-  -- badly: next to "Rückvergütung" it says "rebate", which is the same word in the other
-  -- language, and it was the only English string in a German column.
-  return label, transfer
+  if eventType == "buy" or eventType == "sell" then
+    local rate = formatNumber(event["priceAmount"], event["priceCurrency"])
+    if rate ~= nil and event["priceCurrency"] ~= nil then
+      details[#details + 1] = "Kurs " .. rate .. " " .. event["priceCurrency"]
+    end
+  end
+
+  local fee = tonumber(event["feesAmount"])
+  if fee ~= nil and fee > 0 and event["feesCurrency"] ~= nil then
+    details[#details + 1] =
+      "Gebühr " .. formatNumber(fee, event["feesCurrency"]) .. " " .. event["feesCurrency"]
+  end
+
+  if asset ~= nil then
+    local moved = formatNumber(quantity, asset)
+    local name = label .. " " .. asset
+    local head = moved and (moved .. " " .. asset) or nil
+
+    if head == nil then
+      return name, (#details > 0) and table.concat(details, ", ") or nil
+    end
+    if #details == 0 then
+      return name, head
+    end
+    return name, head .. " (" .. table.concat(details, ", ") .. ")"
+  end
+
+  -- No asset involved: a plain euro movement. The purpose stays empty unless it carries
+  -- something the name does not - the source of a deposit, say. Bitvavo's own type name was in
+  -- here once and earned its place badly: next to "Rückvergütung" it printed "rebate", the same
+  -- word in the other language, and it was the only English string in a German column.
+  return label, (#details > 0) and table.concat(details, ", ") or nil
 end
 
 -- Fetches every page of /v2/account/history and returns the events as one flat list.
