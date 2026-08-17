@@ -118,10 +118,11 @@ fields per entry, exactly as both SDKs document.
 - Total holding = `available + inOrder`. Both are **strings**, including a plain `"0"`.
 - Fiat appears here like any other asset, with `symbol: "EUR"`.
 - Only assets with a balance are returned; zero balances are omitted.
-- **Fixed-staking positions are not included.** Bitvavo states it plainly: this endpoint returns
-  the balance available for trading, and assets locked in fixed staking are reported separately
-  by `GET /stakingBalance`. A portfolio that stakes is therefore understated by this endpoint
-  alone.
+- **Fixed-staking positions are not included** - they come from `GET /stakingBalance`.
+- **Flex staking and lending are included.** Neither locks the asset: flex-staked crypto can be
+  traded at any time, and lent crypto can be sold or withdrawn at any time, so both remain part
+  of the tradable balance. Sources: <https://bitvavo.com/de/earn> and Bitvavo's help centre
+  article on lending.
 
 ### `GET /v2/ticker/price` – public **[verified – live]**
 
@@ -172,16 +173,20 @@ is a normal occurrence rather than an exotic edge case, which is what makes retu
 the right behaviour: a zero would silently understate the portfolio. The list is a snapshot and
 will drift as Bitvavo lists and delists; nothing in the code depends on it.
 
-### `GET /v2/stakingBalance` – private, not used **[verified – official docs]**
+### `GET /v2/stakingBalance` – private **[verified – live, 2026-08-17]**
 
 Weight 5. Returns `[{ "symbol": ..., "amount": ... }]` for assets in fixed staking, which the
 balance endpoint deliberately excludes: *"This request only returns assets locked in fixed
 staking. To get your balance available for trading, use the Get account balance request."*
 
-Not called by this extension. Adding it is a small change, but it alters the portfolio total and
-raises a question the API cannot answer: whether a staked amount should be merged into the
-asset's position or shown separately, given that it cannot be traded. Deciding that needs an
-account that actually stakes.
+Two things the documentation does not say, both confirmed against a live account:
+
+- **A key with `View access` alone may call it.** No extra permission is needed.
+- **An account with nothing staked receives `[]` and HTTP 200**, not an error. Calling it
+  unconditionally is therefore safe for users who do not stake.
+
+A locked amount is listed as its own position rather than added to the tradable one. The total
+would be right either way, but merging would hide that part of it cannot be sold.
 
 ### Possible later additions **[unconfirmed]**
 
@@ -228,11 +233,12 @@ leaving the withdrawal right disabled a real security measure rather than mere t
 
 | Call | Weight | Frequency | Purpose |
 |---|---|---|---|
-| `GET /v2/balance` | 5 | every refresh | holdings |
+| `GET /v2/balance` | 5 | every refresh | tradable holdings |
+| `GET /v2/stakingBalance` | 5 | every refresh | fixed-staking holdings |
 | `GET /v2/ticker/price` | 1 | every refresh | all prices in one call |
 | `GET /v2/assets` | 1 | once a week | symbol → display name, cached in `LocalStorage` |
 
-**Two requests and 6 weight on a normal refresh**, three and 7 when the cached display names
+**Three requests and 11 weight on a normal refresh**, four and 12 when the cached display names
 expire, against a budget of 1000 per minute.
 
 Note that `InitializeSession2` runs on every refresh cycle, not only when the account is added.

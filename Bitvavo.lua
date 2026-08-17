@@ -2,8 +2,9 @@
 -- Fetches crypto and EUR balances and lists each asset with its current EUR price.
 -- MoneyMoney has no account type for crypto, so the account appears as a portfolio.
 --
--- Fixed-staking balances are NOT included: Bitvavo reports them through a separate
--- endpoint (GET /stakingBalance) that this version deliberately does not call.
+-- Covers everything the API exposes as a holding: available, bound in open orders, and fixed
+-- staking. Flex staking needs no special handling - those assets stay tradable and are part of
+-- the ordinary balance.
 --
 -- Data sources:
 --   https://api.bitvavo.com/v2  - balances (private), market prices and asset names (public)
@@ -29,14 +30,14 @@ local ACCESS_WINDOW = "10000"
 
 -- Display names change rarely, so one /assets call a week is plenty. The saving is a request,
 -- not weight: /assets costs 1 rate-limit point of 1000 per minute. Caching keeps a normal
--- refresh at two calls, /balance (5 points) and /ticker/price (1).
+-- refresh at three calls - /balance (5 points), /stakingBalance (5) and /ticker/price (1).
 local ASSET_NAME_TTL = 7 * 24 * 60 * 60
 
 WebBanking{
   -- Pre-release. 1.0 is reserved for the first signed, published build; until then every
   -- version handed over for testing gets the next 0.x, so the protocol window says which
   -- build is actually loaded.
-  version  = 0.9,
+  version  = 0.91,
   url      = "https://bitvavo.com",
   services = { BANK_CODE },
   -- MoneyMoney gives an extension no way to rename the credential fields, so this description
@@ -291,6 +292,41 @@ local function priceInEur (symbol, prices)
   return nil
 end
 
+-- Builds one MoneyMoney position. Shared by the tradable balance and the staking balance so
+-- the two cannot drift apart in how they are priced or named.
+local function addPosition (securities, unpriced, symbol, quantity, names, prices, suffix)
+  if quantity <= 0 then
+    return
+  end
+
+  local price = priceInEur(symbol, prices)
+  if price == nil then
+    unpriced[#unpriced + 1] = symbol
+  end
+
+  securities[#securities + 1] = {
+    name = (names[symbol] or symbol) .. (suffix or ""),
+    market = BANK_CODE,
+    quantity = quantity,
+    -- nil marks a unit holding rather than a cash amount, so MoneyMoney values the position
+    -- as quantity * price. EUR rides along at a price of 1.00.
+    currencyOfQuantity = nil,
+    price = price,
+    currencyOfPrice = "EUR"
+  }
+end
+
+-- Assets locked in fixed staking. Bitvavo excludes them from /balance, so without this call a
+-- portfolio that stakes is reported too low - silently, which is the one outcome worth failing
+-- over. An account that stakes nothing gets an empty array, not an error; verified live.
+local function fetchStakingBalance ()
+  local response, err = requestPrivate("/stakingBalance")
+  if response == nil then
+    error(describeError(err))
+  end
+  return response
+end
+
 function RefreshAccount (account, since)
   MM.printStatus(MM.localizeText("Fetching balances"))
 
@@ -305,6 +341,8 @@ function RefreshAccount (account, since)
       error(describeError(err))
     end
   end
+
+  local staked = fetchStakingBalance()
 
   MM.printStatus(MM.localizeText("Fetching prices"))
   local prices = fetchPrices()
@@ -326,24 +364,22 @@ function RefreshAccount (account, since)
         "please report this at https://github.com/GordonSeipold/moneymoney-bitvavo/issues"))
     end
 
-    local quantity = available + inOrder
-    if quantity > 0 then
-      local price = priceInEur(symbol, prices)
-      if price == nil then
-        unpriced[#unpriced + 1] = symbol
-      end
+    addPosition(securities, unpriced, symbol, available + inOrder, names, prices)
+  end
 
-      securities[#securities + 1] = {
-        name = names[symbol] or symbol,
-        market = BANK_CODE,
-        quantity = quantity,
-        -- nil marks a unit holding rather than a cash amount, so MoneyMoney values the
-        -- position as quantity * price. EUR rides along at a price of 1.00.
-        currencyOfQuantity = nil,
-        price = price,
-        currencyOfPrice = "EUR"
-      }
+  -- Locked positions are listed separately rather than added to the tradable one. Merging them
+  -- would make the total right and hide that part of it cannot be sold.
+  for _, entry in pairs(staked) do
+    local symbol = type(entry) == "table" and entry["symbol"] or nil
+    local amount = type(entry) == "table" and tonumber(entry["amount"]) or nil
+
+    if symbol == nil or amount == nil then
+      error(MM.localizeText(
+        "Bitvavo returned a staking entry in an unexpected format. The API may have changed; " ..
+        "please report this at https://github.com/GordonSeipold/moneymoney-bitvavo/issues"))
     end
+
+    addPosition(securities, unpriced, symbol, amount, names, prices, " (Fixed Staking)")
   end
 
   if #unpriced > 0 then

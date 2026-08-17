@@ -12,13 +12,24 @@ Diese Web Banking Extension für [MoneyMoney](https://moneymoney.app) ruft Ihre 
 - Bewertet jede Position mit dem Marktpreis von Bitvavo selbst. Dadurch entfällt ein externer Kursdienst, und es gibt keine Symbol-Zuordnungstabelle, die ein Asset stillschweigend mit null bewerten könnte
 - Berücksichtigt auch Bestände, die in offenen Orders gebunden sind, nicht nur frei verfügbare
 - Zeigt auch Ihren EUR-Bestand als Position, damit die Gesamtsumme vollständig ist
-- Zwei Anfragen je Aktualisierung; die Liste der Asset-Namen wird eine Woche zwischengespeichert
+- Drei Anfragen je Aktualisierung; die Liste der Asset-Namen wird eine Woche zwischengespeichert
 - In MoneyMoney erscheint das Konto als Wertpapierdepot; einen eigenen Kontotyp für Krypto gibt es dort nicht
+
+### Welche Bestände erfasst werden
+
+| Bestandsart | Erfasst | Wie |
+|---|---|---|
+| Frei verfügbar | ja | Kontostand |
+| In offenen Orders gebunden | ja | Kontostand |
+| Flex Staking | ja | bleibt bei Bitvavo handelbar und ist damit Teil des Kontostands |
+| Lending | ja | ebenso – verliehene Bestände lassen sich jederzeit verkaufen oder auszahlen |
+| Fixed Staking | ja | eigener Endpunkt; erscheint als getrennte Position mit dem Zusatz `(Fixed Staking)` |
+
+Gesperrte Bestände werden bewusst **nicht** mit den handelbaren zusammengezählt. Die Summe wäre zwar richtig, würde aber verbergen, dass ein Teil davon nicht verkauft werden kann.
 
 ### Einschränkungen
 
 - **Nur aktuelle Bestände.** Ein- und Auszahlungen sowie Trades werden nicht importiert.
-- **Fest gestakte Bestände sind nicht enthalten.** Bitvavo meldet sie über einen eigenen Endpunkt, den diese Version nicht abfragt. Wenn Sie staken, zeigt MoneyMoney entsprechend weniger an als die Bitvavo-App.
 - **Einige Assets sind bei Bitvavo vom Handel ausgeschlossen und haben keinen Kurs.** Solche Bestände werden mit ihrer Stückzahl, aber ohne Wert angezeigt – statt mit einem erfundenen Kurs. Das Protokollfenster nennt jedes betroffene Asset, sodass eine Position nie unbemerkt verschwindet. Welche Kryptowährungen handelbar sind, zeigt die [Marktübersicht von Bitvavo](https://bitvavo.com/de/markets).
 
 ---
