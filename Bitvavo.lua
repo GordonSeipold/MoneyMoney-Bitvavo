@@ -472,7 +472,21 @@ local function fetchAccountHistory ()
 end
 
 -- Turns the event list into MoneyMoney transactions for a cash account.
-local function buildCashTransactions (events)
+--
+-- Events at or before "since" are dropped. MoneyMoney passes the point from which it wants
+-- transactions, and whether it discards a repeat of something it already stored is not
+-- documented anywhere we could find. Honouring the cut-off is the only behaviour that is
+-- correct either way: if MoneyMoney does deduplicate, nothing is lost by sending less, and if
+-- it does not, this is what keeps every refresh from stacking the whole history on top of
+-- itself. No overlap margin for the same reason - an overlap is only free under the assumption
+-- we are declining to make. A nil since means a first sync and everything is sent.
+--
+-- The cut-off filters rather than stopping the paging early, because Bitvavo does not document
+-- an ordering for /account/history. Observed responses are newest first, but breaking out of
+-- the loop on that basis would drop events if it ever came back unsorted, and the endpoint is
+-- cheap enough at one rate-limit point per page that reading all of it costs nothing worth
+-- having.
+local function buildCashTransactions (events, since)
   local transactions = {}
 
   for _, event in pairs(events) do
@@ -486,15 +500,17 @@ local function buildCashTransactions (events)
           "https://github.com/GordonSeipold/MoneyMoney-Bitvavo/issues"))
       end
 
-      transactions[#transactions + 1] = {
-        name = describeEvent(event),
-        amount = amount,
-        currency = "EUR",
-        bookingDate = bookingDate,
-        purpose = tostring(event["type"]),
-        transactionCode = tostring(event["transactionId"]),
-        booked = true
-      }
+      if since == nil or bookingDate > since then
+        transactions[#transactions + 1] = {
+          name = describeEvent(event),
+          amount = amount,
+          currency = "EUR",
+          bookingDate = bookingDate,
+          purpose = tostring(event["type"]),
+          transactionCode = tostring(event["transactionId"]),
+          booked = true
+        }
+      end
     end
   end
 
@@ -502,7 +518,7 @@ local function buildCashTransactions (events)
 end
 
 -- The cash account: EUR balance plus every event that moved EUR.
-local function refreshCashAccount ()
+local function refreshCashAccount (since)
   MM.printStatus(MM.localizeText("Fetching balances"))
   local balances = fetchBalances()
 
@@ -514,12 +530,15 @@ local function refreshCashAccount ()
   end
 
   MM.printStatus(MM.localizeText("Fetching transactions"))
-  return { balance = balance, transactions = buildCashTransactions(fetchAccountHistory()) }
+  return {
+    balance = balance,
+    transactions = buildCashTransactions(fetchAccountHistory(), since)
+  }
 end
 
 function RefreshAccount (account, since)
   if account["accountNumber"] == CASH_ACCOUNT then
-    return refreshCashAccount()
+    return refreshCashAccount(since)
   end
 
   MM.printStatus(MM.localizeText("Fetching balances"))
