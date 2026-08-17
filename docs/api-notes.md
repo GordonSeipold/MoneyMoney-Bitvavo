@@ -21,7 +21,7 @@ Headers on every private request:
 | `bitvavo-access-signature` | see below |
 | `bitvavo-access-timestamp` | milliseconds since epoch, as a string |
 | `bitvavo-access-window` | milliseconds of tolerance; SDK default `10000` |
-| `content-type` | `application/json` |
+| `Content-Type` | `application/json` |
 | `Accept` | `application/json` – required, and capitalised, see *Error responses* |
 
 Signature string, concatenated with **no delimiter**:
@@ -101,8 +101,8 @@ bitvavo-ratelimit-resetat: 1786898340000   (ms epoch)
 
 1000 weight per minute, and the cost differs sharply per endpoint **[verified – official docs]**:
 `/balance` and `/stakingBalance` cost **5** each, `/ticker/price` and `/assets` cost **1**. Error
-code `105` signals the limit was exceeded. Irrelevant in practice at two calls per refresh, but
-worth knowing which call is the expensive one – it is the balance, not the full asset list.
+code `105` signals the limit was exceeded. Irrelevant in practice at three calls per refresh,
+but worth knowing where the cost sits: the two balance calls, not the full asset list.
 
 ## Endpoints needed
 
@@ -168,7 +168,9 @@ EUR is itself an asset here.
 `PHB`, `POLS`, `POLYX`, `PRIME`, `QTUM`, `RDNT`, `SOPH`, `SXP`, `THETA`, `TRU`, `UXLINK`.
 
 These are delisted from trading but can still be held, so a balance in one of them is entirely
-possible. **This is the case the unpriced code path exists for.** At roughly one asset in ten it
+possible - and not hypothetically. Bitvavo's own list of lending-enabled assets currently
+includes `TRU`, `IOTX`, `MBOX`, `BLAST`, `NKN`, `FORTH`, `GHST`, `RDNT`, `CORE`, `POLS`, `PHB`
+and `COS`, every one of which has no market. Users evidently hold them. **This is the case the unpriced code path exists for.** At roughly one asset in ten it
 is a normal occurrence rather than an exotic edge case, which is what makes returning no price
 the right behaviour: a zero would silently understate the portfolio. The list is a snapshot and
 will drift as Bitvavo lists and delists; nothing in the code depends on it.
