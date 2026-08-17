@@ -44,7 +44,7 @@ local ASSET_NAME_TTL = 7 * 24 * 60 * 60
 WebBanking{
   -- MAJOR.NN, two decimals - the resolution MoneyMoney prints in the protocol window. 1.00 is
   -- the first published release; every change after it increments the last position.
-  version  = 1.05,
+  version  = 1.06,
   url      = "https://bitvavo.com",
   services = { BANK_CODE },
   -- Observed on the account dialog: MoneyMoney displays none of this, and offers no way to
@@ -616,7 +616,13 @@ local function buildCashTransactions (events, since)
 
   for _, event in pairs(events) do
     local amount = eurEffect(event)
-    if amount ~= 0 then
+
+    -- A coin that moved without costing anything - sent to a private wallet, arrived from one -
+    -- is booked at zero rather than dropped. Otherwise the coins simply stop appearing in the
+    -- portfolio one day with nothing anywhere to say where they went, and the statement shows
+    -- two purchases where the portfolio holds one. Zero leaves the balance untouched, so the
+    -- reconciliation still holds; the line exists to carry its name and its address.
+    if amount ~= 0 or movedAsset(event) ~= nil then
       local bookingDate = parseIsoTimestamp(event["executedAt"])
       if bookingDate == nil then
         error(MM.localizeText(
@@ -632,41 +638,6 @@ local function buildCashTransactions (events, since)
           name = name,
           amount = amount,
           currency = "EUR",
-          bookingDate = bookingDate,
-          purpose = purpose,
-          transactionCode = tostring(event["transactionId"]),
-          booked = true
-        }
-      end
-    end
-  end
-
-  return transactions
-end
-
--- EXPERIMENT, not a decision. Whether MoneyMoney renders transactions on an account of type
--- AccountTypePortfolio is documented nowhere, and returning them is the only way to find out.
--- If it does, a coin leaving for a private wallet becomes visible where it belongs - in the
--- portfolio, next to the holding it left - and neither a third account nor a zero-euro memo on
--- the cash account is needed. If it does not, this comes straight back out.
---
--- Amounts are in the coin, not in euro: this is a movement of the asset. A buy of 0.00456086 BTC
--- reads as +0.00456086 BTC regardless of what it cost.
-local function buildCryptoTransactions (events, since)
-  local transactions = {}
-
-  for _, event in pairs(events) do
-    local asset = movedAsset(event)
-    if asset ~= nil then
-      local amount = currencyEffect(event, asset)
-      local bookingDate = parseIsoTimestamp(event["executedAt"])
-
-      if amount ~= 0 and bookingDate ~= nil and (since == nil or bookingDate > since) then
-        local name, purpose = describeEvent(event)
-        transactions[#transactions + 1] = {
-          name = name,
-          amount = amount,
-          currency = asset,
           bookingDate = bookingDate,
           purpose = purpose,
           transactionCode = tostring(event["transactionId"]),
@@ -756,13 +727,10 @@ function RefreshAccount (account, since)
       table.concat(unpriced, ", ")))
   end
 
-  -- See buildCryptoTransactions: an experiment, awaiting a live answer.
-  MM.printStatus(MM.localizeText("Fetching transactions"))
-  local movements = buildCryptoTransactions(fetchAccountHistory(), since)
-  print(string.format("Bitvavo: %d Krypto-Bewegungen an das Depot übergeben - erscheinen sie?",
-    #movements))
-
-  return { securities = securities, transactions = movements }
+  -- Positions only. MoneyMoney ignores transactions on an account of type AccountTypePortfolio:
+  -- returning three of them alongside the securities produced no list and no error, verified
+  -- live on 2026-08-17. A coin movement is therefore recorded on the cash account instead.
+  return { securities = securities }
 end
 
 function EndSession ()
