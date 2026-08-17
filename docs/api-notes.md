@@ -144,6 +144,19 @@ fields per entry, exactly as both SDKs document.
 - 440 markets in one call. **All prices for the whole portfolio cost a single request.**
 - Quote currencies: **429 EUR, 11 USDC**, nothing else.
 - `price` is a **string** – always `tonumber()`.
+- **Prices carry five significant digits, not two decimals** [verified – live, 2026-08-17]. 309
+  of the 440 markets show exactly five, the rest fewer because trailing zeros are dropped. At a
+  Bitcoin price around 54,868 EUR that leaves no room for cents at all: `BTC-EUR` arrives as the
+  plain integer `"54868"`, and the bid/ask spread of exactly 1 EUR confirms that is the tick
+  size rather than rounding. `PEPE-EUR` shows the same rule from the other end, at
+  `"0.0000022537"`.
+
+  No other endpoint offers more: `/ticker/24h` and `/ticker/book` report whole euros for
+  `BTC-EUR` too. So a position in MoneyMoney showing "54.849,00 €" is displaying Bitvavo's real
+  precision, not a rounding this extension introduced. The effect on a valuation is negligible -
+  half a euro on 54,868 is 0.0009 % - but it surprises people, which is why it is written down.
+
+  The API has no `pricePrecision` field; all 440 entries in `/v2/markets` leave it unset.
 
 > The specification's example for this field reads `'34,243'`, with a comma. Live responses use
 > a plain decimal point (`"54821"`), so the example is a documentation error. Worth knowing what
