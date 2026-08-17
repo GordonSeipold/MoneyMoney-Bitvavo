@@ -49,6 +49,7 @@ Für eine feste Frist gesperrte Bestände werden bewusst nicht zur handelbaren P
 
 ### Einschränkungen
 
+- **Beim ersten Abruf holt MoneyMoney ein Jahr Historie, nicht alles.** Wie weit zurückgefragt wird, entscheidet MoneyMoney und nicht diese Extension. Ältere Vorgänge werden gar nicht erst angefordert und erscheinen deshalb nicht.
 - **Das Depot zeigt keine Bewegungen.** MoneyMoney stellt bei einem Wertpapierdepot ausschließlich Bestände dar. Was mit einem Coin geschehen ist, steht deshalb im Verrechnungskonto.
 - **Tausch zwischen zwei Kryptowährungen erscheint nicht als eigene Buchung.** Ein solcher Vorgang bewegt zwei Coins gleichzeitig, und eine Buchung hat genau einen Betrag in genau einer Währung. Die Bestände im Depot stimmen danach trotzdem.
 - **Einige Assets sind bei Bitvavo vom Handel ausgeschlossen und haben keinen Kurs.** Solche Bestände werden mit ihrer Stückzahl, aber ohne Wert angezeigt – statt mit einem erfundenen Kurs. Das Protokollfenster von MoneyMoney (*Fenster → Protokoll*) nennt jedes betroffene Asset. Welche Kryptowährungen handelbar sind, zeigt die [Marktübersicht von Bitvavo](https://bitvavo.com/de/markets).
@@ -110,6 +111,7 @@ Fehler, Fragen und Verbesserungsvorschläge sind willkommen – am besten als [I
 
 - **Nur lesender Zugriff.** Die Extension stellt ausschließlich Leseanfragen. Sie erteilt niemals eine Order, bewegt keine Bestände und ändert keine Einstellung.
 - **Nichts geht an Dritte.** Die Extension spricht ausschließlich mit `api.bitvavo.com`. Ins Protokollfenster schreibt sie zur Fehlersuche, wie viele Zeichen Sie in die beiden Felder eingetragen haben – nie deren Inhalt – sowie die Namen von Assets ohne Kurs. Das bleibt auf Ihrem Rechner.
+- **Keine vollständige IBAN in Ihrer Datenbank.** Bei einer Einzahlung nennt die Buchung Ihre Bankverbindung in der Form `DE80***00`. Bitvavo liefert sie über einen zweiten Endpunkt auch ungekürzt; die Extension fragt diesen bewusst nicht ab. Die verkürzte Form genügt, um die Quelle zu erkennen.
 
 ## KI-Unterstützung
 

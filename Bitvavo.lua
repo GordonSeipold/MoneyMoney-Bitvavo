@@ -395,13 +395,12 @@ local function parseIsoTimestamp (iso)
   return asLocal + os.difftime(asLocal, os.time(os.date("!*t", asLocal)))
 end
 
--- How much EUR an event moved, fees included, positive for money in.
+-- How much of one currency an event moved, fees included, positive for money in.
 --
 -- Deliberately computed from the currency fields rather than from the event type. Bitvavo
 -- documents fourteen types and adds to them; a table of known types would silently drop the
--- unfamiliar ones, and the running balance would be wrong without anything looking wrong. An
--- event that moved no EUR returns 0 and is not a cash booking at all - a crypto withdrawal, for
--- instance, or a swap between two coins.
+-- unfamiliar ones, and the running balance would be wrong without anything looking wrong. A live
+-- account returned campaign_new_user_incentive, which appears in none of the fourteen.
 local function currencyEffect (event, currency)
   local total = 0.0
 
@@ -437,14 +436,24 @@ local function movedAsset (event)
 end
 
 -- Same principle as the error codes: translate where it helps, fall back to what Bitvavo says.
+--
+-- Only types whose meaning is certain are listed. Bitvavo documents fourteen and describes none
+-- of them - the OpenAPI specification carries the enumeration and no prose - so for most of them
+-- the word itself is all there is to go on. Nine are therefore absent on purpose: affiliate,
+-- distribution, internal_transfer, withdrawal_cancelled, loan, external_transferred_funds,
+-- manually_assigned, staking and fixed_staking.
+--
+-- Staking is the instructive case. "Staking-Ertrag" would read well and might be wrong: an entry
+-- of that type could equally be the payout or the act of locking the coins away, and nothing
+-- available here decides which. The fallback prints Bitvavo's own word instead, which is not as
+-- pretty and cannot be wrong. Nothing is lost beyond wording - the amount comes from the
+-- currency fields either way, so an unlabelled type still books correctly.
 local EVENT_LABEL = {
   buy        = "Kauf",
   sell       = "Verkauf",
   deposit    = "Einzahlung",
   withdrawal = "Auszahlung",
-  rebate     = "Rückvergütung",
-  staking    = "Staking-Ertrag",
-  fixed_staking = "Staking-Ertrag (fest)"
+  rebate     = "Rückvergütung"
 }
 
 -- Bitvavo writes its type names in snake case. An unknown one ends up in the name column of a
@@ -455,12 +464,6 @@ local function humaniseType (rawType)
   return (text:gsub("^%l", string.upper))
 end
 
--- Formats a number the way a German statement reads, with a comma for the decimal mark.
---
--- EUR gets two decimals because that is what money looks like - unless two decimals would round
--- a real amount down to zero. A coin trading below a cent is exactly that case, and "0,00" in a
--- price would be a lie rather than a rounding. Quantities keep up to eight decimals with the
--- trailing zeros trimmed, so a whole number is not padded with noise.
 -- Groups the integer part in threes, German style: 54676 -> 54.676. A rate in the tens of
 -- thousands is the normal case here, and an ungrouped one has to be counted rather than read.
 local function groupThousands (digits)
@@ -469,6 +472,12 @@ local function groupThousands (digits)
   return (grouped:gsub("^%.", ""))
 end
 
+-- Formats a number the way a German statement reads, with a comma for the decimal mark.
+--
+-- EUR gets two decimals because that is what money looks like - unless two decimals would round
+-- a real amount down to zero. A coin trading below a cent is exactly that case, and "0,00" in a
+-- price would be a lie rather than a rounding. Quantities keep up to eight decimals with the
+-- trailing zeros trimmed, so a whole number is not padded with noise.
 local function formatNumber (value, currency)
   local number = tonumber(value)
   if number == nil then
@@ -496,15 +505,6 @@ local function formatNumber (value, currency)
   return formatted
 end
 
--- Returns the two strings MoneyMoney shows for a booking: its name and its purpose line.
---
--- A trade names the quantity and the asset, with the rate and any fee behind it. "Kauf" on its
--- own is an amount without a story, and the rate is the one number a statement cannot
--- reconstruct later once the market has moved.
---
--- Everything else carries Bitvavo's own type in the purpose, which is what someone comparing
--- this against a Bitvavo export needs. The exception is a type this extension does not know:
--- there the name already is that term, so repeating it would only fill the column twice.
 -- Bitvavo calls both of these "withdrawal": euro sent to a bank account, and a coin sent to a
 -- wallet the customer controls. They are not the same event. The first leaves the relationship;
 -- the second moves the same holding into the customer's own custody, and nothing was spent.
@@ -518,6 +518,7 @@ local ASSET_EVENT_LABEL = {
   withdrawal = "Übertragung"
 }
 
+-- Returns the two strings MoneyMoney shows for a booking: its name and its purpose line.
 local function describeEvent (event)
   local eventType = event["type"]
   local label = EVENT_LABEL[eventType] or humaniseType(eventType)
@@ -652,19 +653,15 @@ end
 
 -- Turns the event list into MoneyMoney transactions for a cash account.
 --
--- Events at or before "since" are dropped. MoneyMoney passes the point from which it wants
--- transactions, and whether it discards a repeat of something it already stored is not
--- documented anywhere we could find. Honouring the cut-off is the only behaviour that is
--- correct either way: if MoneyMoney does deduplicate, nothing is lost by sending less, and if
--- it does not, this is what keeps every refresh from stacking the whole history on top of
--- itself. No overlap margin for the same reason - an overlap is only free under the assumption
--- we are declining to make. A nil since means a first sync and everything is sent.
+-- Events at or before "since" are dropped, which is not the same cut as the fromDate handed to
+-- the request: fromDate is inclusive, this is strict. The request narrows the range, this draws
+-- the edge exactly.
 --
--- The cut-off filters rather than stopping the paging early, because Bitvavo does not document
--- an ordering for /account/history. Observed responses are newest first, but breaking out of
--- the loop on that basis would drop events if it ever came back unsorted, and the endpoint is
--- cheap enough at one rate-limit point per page that reading all of it costs nothing worth
--- having.
+-- MoneyMoney does deduplicate - a refresh returning bookings it already holds reports "0 are
+-- new", verified live - so this filter is not what prevents duplicates. It is worth keeping
+-- anyway: relying on undocumented behaviour for correctness is a trade this extension does not
+-- need to make, and sending only what was asked for is cheaper on both sides. No overlap margin
+-- for the same reason.
 local function buildCashTransactions (events, since)
   local transactions = {}
 
@@ -709,7 +706,8 @@ local function buildCashTransactions (events, since)
   return transactions
 end
 
--- The cash account: EUR balance plus every event that moved EUR.
+-- The cash account: the EUR balance, and the events behind it. Not only the ones that moved
+-- euro - a coin transfer is booked at zero, see buildCashTransactions.
 local function refreshCashAccount (since)
   MM.printStatus(MM.localizeText("Fetching balances"))
   local balances = fetchBalances()
