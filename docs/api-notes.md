@@ -47,8 +47,8 @@ timestamp + METHOD + "/v2" + path + [body]
   appending `""` is equivalent).
 - `HMAC-SHA256(secret, string)`, **hex encoded** (PHP `hash_hmac` default, Python `hexdigest`).
 
-In MoneyMoney terms: `MM.hmac256` returns **binary**, so it must be hex-encoded explicitly –
-the same `bin2hex` helper the existing Binance script uses.
+In MoneyMoney terms: `MM.hmac256` returns **binary**, so the result must be hex-encoded
+explicitly before it goes into the header.
 
 Worked example from the official docs. **[verified]** – the concatenation order above reproduces
 this digest exactly (`openssl dgst -sha256 -hmac`), so the signed-string construction is settled
