@@ -37,7 +37,7 @@ Fixed Staking fällt heraus, weil diese Bestände für eine feste Frist gesperrt
 
 ## Voraussetzungen
 
-- MoneyMoney für macOS. Getestet wurde mit Version 2.5.1 unter macOS 26.5.2; ältere Versionen sind ungetestet.
+- [MoneyMoney für macOS](https://moneymoney.app). Getestet wurde mit Version 2.5.1 unter macOS 26.5.2; ältere Versionen sind ungetestet.
 - Ein [Bitvavo-Konto](https://bitvavo.com/de) mit einem API-Schlüssel, der **ausschließlich Leserechte** besitzt
 
 ---
