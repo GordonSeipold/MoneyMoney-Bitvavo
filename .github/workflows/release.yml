@@ -41,7 +41,7 @@ jobs:
       - name: Read the tested-with line from the source
         id: tested
         run: |
-          line=$(grep -m1 '^-- Tested with:' *.lua | sed 's/^-- Tested with: //')
+          line=$(grep -m1 '^-- Tested with:' *.lua | sed 's/^-- //')
           echo "line=$line" >> "$GITHUB_OUTPUT"
 
       - name: Create release
@@ -50,4 +50,4 @@ jobs:
           files: '*.lua'
           generate_release_notes: true
           body: |
-            Getestet mit ${{ steps.tested.outputs.line }}.
+            ${{ steps.tested.outputs.line }}
