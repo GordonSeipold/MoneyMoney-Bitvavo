@@ -19,7 +19,7 @@
 --
 -- MIT License
 -- Copyright (c) 2026 Gordon Seipold
--- https://github.com/GordonSeipold/moneymoney-bitvavo
+-- https://github.com/GordonSeipold/MoneyMoney-Bitvavo
 
 local BANK_CODE  = "Bitvavo"
 local API_HOST   = "https://api.bitvavo.com"
@@ -36,7 +36,7 @@ local ASSET_NAME_TTL = 7 * 24 * 60 * 60
 WebBanking{
   -- MAJOR.NN, two decimals - the resolution MoneyMoney prints in the protocol window. 1.00 is
   -- the first published release; every change after it increments the last position.
-  version  = 1.00,
+  version  = 1.01,
   url      = "https://bitvavo.com",
   services = { BANK_CODE },
   -- Observed on the account dialog: MoneyMoney displays none of this, and offers no way to
@@ -360,7 +360,7 @@ function RefreshAccount (account, since)
     if symbol == nil or available == nil or inOrder == nil then
       error(MM.localizeText(
         "Bitvavo returned a balance entry in an unexpected format. The API may have changed; " ..
-        "please report this at https://github.com/GordonSeipold/moneymoney-bitvavo/issues"))
+        "please report this at https://github.com/GordonSeipold/MoneyMoney-Bitvavo/issues"))
     end
 
     addPosition(securities, unpriced, symbol, available + inOrder, names, prices)
@@ -375,7 +375,7 @@ function RefreshAccount (account, since)
     if symbol == nil or amount == nil then
       error(MM.localizeText(
         "Bitvavo returned a staking entry in an unexpected format. The API may have changed; " ..
-        "please report this at https://github.com/GordonSeipold/moneymoney-bitvavo/issues"))
+        "please report this at https://github.com/GordonSeipold/MoneyMoney-Bitvavo/issues"))
     end
 
     addPosition(securities, unpriced, symbol, amount, names, prices, " (Fixed Staking)")
