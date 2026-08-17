@@ -44,7 +44,7 @@ local ASSET_NAME_TTL = 7 * 24 * 60 * 60
 WebBanking{
   -- MAJOR.NN, two decimals - the resolution MoneyMoney prints in the protocol window. 1.00 is
   -- the first published release; every change after it increments the last position.
-  version  = 1.03,
+  version  = 1.04,
   url      = "https://bitvavo.com",
   services = { BANK_CODE },
   -- Observed on the account dialog: MoneyMoney displays none of this, and offers no way to
@@ -64,6 +64,9 @@ local connection
 -- and it is the most expensive call in the set at 5 rate-limit points. Session-scoped is
 -- therefore right: fresh every cycle, fetched once within it.
 local sessionBalances
+
+-- Likewise the account history: both accounts read it in the same refresh cycle.
+local sessionHistory
 
 function SupportsBank (protocol, bankCode)
   return protocol == ProtocolWebBanking and bankCode == BANK_CODE
@@ -213,7 +216,10 @@ end
 function ListAccounts (knownAccounts)
   return {
     {
-      name = BANK_CODE,
+      -- The names are what MoneyMoney shows; the numbers are what it keys on. Renaming is
+      -- therefore free, and "Depot" and "Verrechnungskonto" are what a German statement calls
+      -- these two - the holdings, and the cash account that settles them.
+      name = BANK_CODE .. " Depot",
       accountNumber = PORTFOLIO_ACCOUNT,
       currency = "EUR",
       portfolio = true,
@@ -222,7 +228,7 @@ function ListAccounts (knownAccounts)
     {
       -- EUR moved out of the portfolio and into an account of its own. It cannot be in both:
       -- a cash balance plus a Euro position would count the same money twice.
-      name = BANK_CODE .. " EUR",
+      name = BANK_CODE .. " Verrechnungskonto",
       accountNumber = CASH_ACCOUNT,
       currency = "EUR",
       portfolio = false,
@@ -398,21 +404,38 @@ end
 -- unfamiliar ones, and the running balance would be wrong without anything looking wrong. An
 -- event that moved no EUR returns 0 and is not a cash booking at all - a crypto withdrawal, for
 -- instance, or a swap between two coins.
-local function eurEffect (event)
+local function currencyEffect (event, currency)
   local total = 0.0
 
-  if event["receivedCurrency"] == "EUR" then
+  if event["receivedCurrency"] == currency then
     total = total + (tonumber(event["receivedAmount"]) or 0)
   end
-  if event["sentCurrency"] == "EUR" then
+  if event["sentCurrency"] == currency then
     total = total - (tonumber(event["sentAmount"]) or 0)
   end
   -- A rebate carries no fee fields at all, so nothing here may be assumed present.
-  if event["feesCurrency"] == "EUR" then
+  if event["feesCurrency"] == currency then
     total = total - (tonumber(event["feesAmount"]) or 0)
   end
 
   return total
+end
+
+local function eurEffect (event)
+  return currencyEffect(event, "EUR")
+end
+
+-- The one asset an event moved, or nil where none did. A trade touches exactly one besides EUR,
+-- and a coin-to-coin swap - two of them - is deliberately not represented: it is one event, and
+-- MoneyMoney has no booking that is two amounts in two currencies.
+local function movedAsset (event)
+  for _, field in ipairs({ "receivedCurrency", "sentCurrency" }) do
+    local currency = event[field]
+    if type(currency) == "string" and currency ~= "" and currency ~= "EUR" then
+      return currency
+    end
+  end
+  return nil
 end
 
 -- Same principle as the error codes: translate where it helps, fall back to what Bitvavo says.
@@ -470,12 +493,12 @@ local function describeEvent (event)
   local known = EVENT_LABEL[eventType]
   local label = known or humaniseType(eventType)
 
-  -- On a buy the asset arrives and EUR leaves; on a sell it is the other way round.
-  local asset = event["receivedCurrency"]
-  local quantity = event["receivedAmount"]
-  if asset == "EUR" or asset == nil then
-    asset = event["sentCurrency"]
-    quantity = event["sentAmount"]
+  -- On a buy the asset arrives and EUR leaves; on a sell, and on a transfer out, the reverse.
+  local asset = movedAsset(event)
+  local quantity = nil
+  if asset ~= nil then
+    quantity = (asset == event["receivedCurrency"]) and event["receivedAmount"]
+               or event["sentAmount"]
   end
 
   -- Where the money came from or went to. Present on transfers, null on everything else.
@@ -496,14 +519,28 @@ local function describeEvent (event)
     end
   end
 
-  if (eventType == "buy" or eventType == "sell") and asset ~= nil and asset ~= "EUR" then
-    local traded = formatNumber(quantity, asset)
-    local name = label .. " " .. (traded and (traded .. " ") or "") .. asset
+  -- A euro amount is already in its own column; naming it again would say it twice. A coin
+  -- amount is nowhere else, so it goes in the name - "Auszahlung 0,00033876 BTC" says what left,
+  -- where "Auszahlung" alone says only that something did.
+  --
+  -- The name states what was moved, the booking amount what the move cost in total, and the gap
+  -- between the two is the fee, which is why the fee is always named. A line whose text says one
+  -- number and whose amount column says another, with nothing to explain the difference, is a
+  -- line that will be read as a bug.
+  if asset ~= nil then
+    local moved = formatNumber(quantity, asset)
+    local name = label .. " " .. (moved and (moved .. " ") or "") .. asset
 
     local details = {}
-    local rate = formatNumber(event["priceAmount"], event["priceCurrency"])
-    if rate ~= nil and event["priceCurrency"] ~= nil then
-      details[#details + 1] = "Kurs " .. rate .. " " .. event["priceCurrency"]
+    if transfer ~= nil then
+      details[#details + 1] = transfer
+    end
+
+    if eventType == "buy" or eventType == "sell" then
+      local rate = formatNumber(event["priceAmount"], event["priceCurrency"])
+      if rate ~= nil and event["priceCurrency"] ~= nil then
+        details[#details + 1] = "Kurs " .. rate .. " " .. event["priceCurrency"]
+      end
     end
 
     local fee = tonumber(event["feesAmount"])
@@ -523,6 +560,10 @@ end
 
 -- Fetches every page of /v2/account/history and returns the events as one flat list.
 local function fetchAccountHistory ()
+  if sessionHistory ~= nil then
+    return sessionHistory
+  end
+
   local events = {}
   local page = 1
 
@@ -550,6 +591,7 @@ local function fetchAccountHistory ()
     page = page + 1
   until page > totalPages or page > HISTORY_PAGE_LIMIT
 
+  sessionHistory = events
   return events
 end
 
@@ -589,6 +631,41 @@ local function buildCashTransactions (events, since)
           name = name,
           amount = amount,
           currency = "EUR",
+          bookingDate = bookingDate,
+          purpose = purpose,
+          transactionCode = tostring(event["transactionId"]),
+          booked = true
+        }
+      end
+    end
+  end
+
+  return transactions
+end
+
+-- EXPERIMENT, not a decision. Whether MoneyMoney renders transactions on an account of type
+-- AccountTypePortfolio is documented nowhere, and returning them is the only way to find out.
+-- If it does, a coin leaving for a private wallet becomes visible where it belongs - in the
+-- portfolio, next to the holding it left - and neither a third account nor a zero-euro memo on
+-- the cash account is needed. If it does not, this comes straight back out.
+--
+-- Amounts are in the coin, not in euro: this is a movement of the asset. A buy of 0.00456086 BTC
+-- reads as +0.00456086 BTC regardless of what it cost.
+local function buildCryptoTransactions (events, since)
+  local transactions = {}
+
+  for _, event in pairs(events) do
+    local asset = movedAsset(event)
+    if asset ~= nil then
+      local amount = currencyEffect(event, asset)
+      local bookingDate = parseIsoTimestamp(event["executedAt"])
+
+      if amount ~= 0 and bookingDate ~= nil and (since == nil or bookingDate > since) then
+        local name, purpose = describeEvent(event)
+        transactions[#transactions + 1] = {
+          name = name,
+          amount = amount,
+          currency = asset,
           bookingDate = bookingDate,
           purpose = purpose,
           transactionCode = tostring(event["transactionId"]),
@@ -678,11 +755,18 @@ function RefreshAccount (account, since)
       table.concat(unpriced, ", ")))
   end
 
-  return { securities = securities }
+  -- See buildCryptoTransactions: an experiment, awaiting a live answer.
+  MM.printStatus(MM.localizeText("Fetching transactions"))
+  local movements = buildCryptoTransactions(fetchAccountHistory(), since)
+  print(string.format("Bitvavo: %d Krypto-Bewegungen an das Depot übergeben - erscheinen sie?",
+    #movements))
+
+  return { securities = securities, transactions = movements }
 end
 
 function EndSession ()
   sessionBalances = nil
+  sessionHistory = nil
   if connection ~= nil then
     connection:close()
     connection = nil
