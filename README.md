@@ -52,20 +52,22 @@ Gesperrte Bestände werden bewusst **nicht** mit den handelbaren zusammengezähl
 
 ## 2. Extension installieren
 
-MoneyMoney lädt Extensions normalerweise nur, wenn sie vom Hersteller signiert wurden. Diese Extension ist **noch nicht signiert**, deshalb führt derzeit nur der zweite Weg zum Ziel.
+### Empfohlen: die signierte Fassung
 
-**Signiert – sobald verfügbar, dann der empfohlene Weg:**
-
-1. Extension "Bestandsabfrage für Bitvavo.com" auf <https://moneymoney.app/extensions/> herunterladen
+1. Extension "Bestandsabfrage für Bitvavo.com" auf <https://moneymoney.app/extensions/> herunterladen.
 2. *MoneyMoney → Hilfe → Zeige Datenbank im Finder*, die heruntergeladene Datei in den Ordner `Extensions` verschieben.
 3. MoneyMoney neu starten.
 
-**Unsigniert, aus diesem Repository:**
+### Alternative: die Fassung aus diesem Repository
+
+MoneyMoney lädt Extensions nur, wenn sie signiert sind – für diesen Weg müssen Sie die Prüfung abschalten.
 
 1. `Bitvavo.lua` aus dem [aktuellen Release](../../releases/latest) herunterladen.
 2. *MoneyMoney → Hilfe → Zeige Datenbank im Finder*, die Datei `Bitvavo.lua` in den Ordner `Extensions` verschieben.
 3. *MoneyMoney → Einstellungen → Extensions* → Haken bei **Digitale Signatur von Extensions überprüfen** entfernen. Wenn Sie MoneyMoney aus dem App Store nutzen, lässt sich dieser Haken unter Umständen nur in der Beta-Fassung von MoneyMoney entfernen.
 4. MoneyMoney neu starten.
+
+Die Fassung aus dem Repository kann neuer sein als die signierte: Jede Version muss einzeln signiert werden.
 
 ---
 
