@@ -34,8 +34,20 @@ jobs:
             echo "::warning::This release is unsigned. Users must disable signature verification in MoneyMoney."
           fi
 
+      # The convention is that a release says what it was tested against. Reading it from the
+      # source rather than typing it into the release means it cannot be forgotten and cannot
+      # drift from what the file itself claims. The value comes from the repository, not from
+      # an event payload, so it is maintainer-controlled like the rest of the checkout.
+      - name: Read the tested-with line from the source
+        id: tested
+        run: |
+          line=$(grep -m1 '^-- Tested with:' *.lua | sed 's/^-- Tested with: //')
+          echo "line=$line" >> "$GITHUB_OUTPUT"
+
       - name: Create release
         uses: softprops/action-gh-release@v2
         with:
           files: '*.lua'
           generate_release_notes: true
+          body: |
+            Getestet mit ${{ steps.tested.outputs.line }}.
