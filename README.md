@@ -54,13 +54,13 @@ Fixed Staking fällt heraus, weil diese Bestände für eine feste Frist gesperrt
 
 ### 2. Extension in MoneyMoney installieren
 
-### Empfohlen: die signierte Fassung
+**Empfohlen: die signierte Fassung**
 
 1. Extension "Bestandsabfrage für Bitvavo.com" auf <https://moneymoney.app/extensions/> herunterladen.
 2. *MoneyMoney → Hilfe → Zeige Datenbank im Finder*, die heruntergeladene Datei in den Ordner `Extensions` verschieben.
 3. MoneyMoney neu starten.
 
-### Alternative: die Fassung aus diesem Repository
+**Alternative: die Fassung aus diesem Repository**
 
 MoneyMoney lädt Extensions nur, wenn sie signiert sind – für diesen Weg müssen Sie die Prüfung abschalten.
 
