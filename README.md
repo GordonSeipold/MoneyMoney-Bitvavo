@@ -42,7 +42,9 @@ Fixed Staking fällt heraus, weil diese Bestände für eine feste Frist gesperrt
 
 ---
 
-## 1. Bei Bitvavo einen API-Schlüssel mit Leserechten erstellen
+## Einrichtung
+
+### 1. Bei Bitvavo einen API-Schlüssel mit Leserechten erstellen
 
 1. Bei [bitvavo.com](https://bitvavo.com/) anmelden und die Konto-Einstellungen öffnen.
 2. Im Bereich **API** einen neuen Schlüssel anlegen und benennen, zum Beispiel `MoneyMoney`.
@@ -50,9 +52,7 @@ Fixed Staking fällt heraus, weil diese Bestände für eine feste Frist gesperrt
 4. Die **IP-Whitelist** ausfüllen, sofern gewünscht; andernfalls leer lassen.
 5. Schlüssel und Secret notieren – beide brauchen Sie in Schritt 3. **Das Secret zeigt Bitvavo nur ein einziges Mal an.**
 
----
-
-## 2. Extension installieren
+### 2. Extension in MoneyMoney installieren
 
 ### Empfohlen: die signierte Fassung
 
@@ -71,9 +71,7 @@ MoneyMoney lädt Extensions nur, wenn sie signiert sind – für diesen Weg müs
 
 Die Fassung aus dem Repository kann neuer sein als die signierte: Jede Version muss einzeln signiert werden.
 
----
-
-## 3. Konto hinzufügen
+### 3. Konto in MoneyMoney hinzufügen
 
 *Konto → Konto hinzufügen → Andere → Bitvavo*, dann eingeben:
 
