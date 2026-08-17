@@ -426,17 +426,78 @@ local EVENT_LABEL = {
   fixed_staking = "Staking-Ertrag (fest)"
 }
 
-local function describeEvent (event)
-  local label = EVENT_LABEL[event["type"]] or tostring(event["type"])
-  local asset = event["receivedCurrency"]
-  if asset == "EUR" or asset == nil then
-    asset = event["sentCurrency"]
+-- Bitvavo writes its type names in snake case. An unknown one ends up in the name column of a
+-- statement, where "campaign_new_user_incentive" reads as machine output that escaped. Seen
+-- live: that exact type, for a new-customer credit that no documentation lists.
+local function humaniseType (rawType)
+  local text = tostring(rawType):gsub("_", " ")
+  return (text:gsub("^%l", string.upper))
+end
+
+-- Formats a number the way a German statement reads, with a comma for the decimal mark.
+--
+-- EUR gets two decimals because that is what money looks like - unless two decimals would round
+-- a real amount down to zero. A coin trading below a cent is exactly that case, and "0,00" in a
+-- price would be a lie rather than a rounding. Quantities keep up to eight decimals with the
+-- trailing zeros trimmed, so a whole number is not padded with noise.
+local function formatNumber (value, currency)
+  local number = tonumber(value)
+  if number == nil then
+    return nil
   end
 
-  if (event["type"] == "buy" or event["type"] == "sell") and asset ~= nil and asset ~= "EUR" then
-    return label .. " " .. asset
+  if currency == "EUR" and math.abs(number) >= 0.005 then
+    return (string.format("%.2f", number):gsub("%%.", ","))
   end
-  return label
+
+  local text = string.format("%.8f", number)
+  text = text:gsub("0+$", "")
+  text = text:gsub("%%.$", "")
+  return (text:gsub("%%.", ","))
+end
+
+-- Returns the two strings MoneyMoney shows for a booking: its name and its purpose line.
+--
+-- A trade names the quantity and the asset, with the rate and any fee behind it. "Kauf" on its
+-- own is an amount without a story, and the rate is the one number a statement cannot
+-- reconstruct later once the market has moved.
+--
+-- Everything else carries Bitvavo's own type in the purpose, which is what someone comparing
+-- this against a Bitvavo export needs. The exception is a type this extension does not know:
+-- there the name already is that term, so repeating it would only fill the column twice.
+local function describeEvent (event)
+  local eventType = event["type"]
+  local known = EVENT_LABEL[eventType]
+  local label = known or humaniseType(eventType)
+
+  -- On a buy the asset arrives and EUR leaves; on a sell it is the other way round.
+  local asset = event["receivedCurrency"]
+  local quantity = event["receivedAmount"]
+  if asset == "EUR" or asset == nil then
+    asset = event["sentCurrency"]
+    quantity = event["sentAmount"]
+  end
+
+  if (eventType == "buy" or eventType == "sell") and asset ~= nil and asset ~= "EUR" then
+    local traded = formatNumber(quantity, asset)
+    local name = label .. " " .. (traded and (traded .. " ") or "") .. asset
+
+    local details = {}
+    local rate = formatNumber(event["priceAmount"], event["priceCurrency"])
+    if rate ~= nil and event["priceCurrency"] ~= nil then
+      details[#details + 1] = "Kurs " .. rate .. " " .. event["priceCurrency"]
+    end
+
+    local fee = tonumber(event["feesAmount"])
+    if fee ~= nil and fee > 0 and event["feesCurrency"] ~= nil then
+      details[#details + 1] =
+        "Gebühr " .. formatNumber(fee, event["feesCurrency"]) .. " " .. event["feesCurrency"]
+    end
+
+    return name, (#details > 0) and table.concat(details, ", ") or nil
+  end
+
+  return label, known and tostring(eventType) or nil
 end
 
 -- Fetches every page of /v2/account/history and returns the events as one flat list.
@@ -501,12 +562,14 @@ local function buildCashTransactions (events, since)
       end
 
       if since == nil or bookingDate > since then
+        local name, purpose = describeEvent(event)
+
         transactions[#transactions + 1] = {
-          name = describeEvent(event),
+          name = name,
           amount = amount,
           currency = "EUR",
           bookingDate = bookingDate,
-          purpose = tostring(event["type"]),
+          purpose = purpose,
           transactionCode = tostring(event["transactionId"]),
           booked = true
         }
