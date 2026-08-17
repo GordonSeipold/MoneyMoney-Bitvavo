@@ -366,9 +366,10 @@ end
 -- response so large that a slow connection times out.
 local HISTORY_PAGE_SIZE = 100
 
--- Guards against an endless loop should totalPages ever misbehave. 200 pages at 100 items is
--- 20000 events - far beyond any private account.
-local HISTORY_PAGE_LIMIT = 200
+-- Guards against an endless loop should totalPages ever misbehave. 1000 pages at 100 items is
+-- 100000 events. Reaching it is reported rather than passed over: a history that stops early
+-- without saying so would leave the balance unexplained and look like a bug in the numbers.
+local HISTORY_PAGE_LIMIT = 1000
 
 -- executedAt is ISO 8601 in UTC ("2026-08-17T03:23:57.215Z"), while MoneyMoney wants POSIX
 -- seconds. os.time reads its table as local time, so the offset has to be added back.
@@ -600,33 +601,30 @@ local function describeEvent (event)
   return label, (#details > 0) and table.concat(details, ", ") or nil
 end
 
--- Fetches /v2/account/history and returns the events as one flat list.
+-- Fetches the whole of /v2/account/history and returns the events as one flat list.
 --
--- The range is narrowed server side with fromDate, so a refresh asks for what happened since
--- MoneyMoney last looked instead of for everything. Without it an account with ten thousand
--- events would page through all hundred pages on every single refresh, and the cost would grow
--- with the account's age forever. A first sync has no cut-off and does read everything, once.
+-- Deliberately unrestricted. The endpoint takes fromDate and toDate, and MoneyMoney hands
+-- RefreshAccount a "since" that would fit straight into fromDate - a fresh setup asked for one
+-- year back. Passing it on would make every refresh cheaper and would also decide, here, how far
+-- a user's history reaches. That is not this extension's decision to make: it delivers
+-- everything the account has, and what MoneyMoney keeps or shows of it is MoneyMoney's business.
 --
--- Deliberately not narrowed by type. The endpoint offers that filter and its enumeration is the
--- same fourteen types Bitvavo documents - which a live account was already found to exceed. A
--- type filter would have dropped a real credit of 20 EUR at the server, where nothing in the
--- response could hint that anything was missing.
-local function fetchAccountHistory (since)
+-- The price is that a refresh pages the full history rather than the tail of it, so its cost
+-- grows with the age of the account: a hundred requests for ten thousand events, each costing
+-- one of the thousand rate-limit points per minute.
+--
+-- Deliberately not narrowed by type either. The endpoint offers that filter and its enumeration
+-- is the same fourteen types Bitvavo documents - which a live account was already found to
+-- exceed. A type filter would have dropped a real credit of 20 EUR at the server, where nothing
+-- in the response could hint that anything was missing.
+local function fetchAccountHistory ()
   local events = {}
   local page = 1
-
-  -- Milliseconds, and an integer: "%d" because Lua would otherwise render a float and Bitvavo
-  -- would reject it. fromDate is inclusive where the filter below is strict, so an event landing
-  -- exactly on the cut-off is fetched and then dropped - the two are not redundant, they draw
-  -- the boundary at different sharpness.
-  local range = ""
-  if since ~= nil then
-    range = string.format("&fromDate=%d", math.floor(since) * 1000)
-  end
+  local totalPages = 1
 
   repeat
     local response, err = requestPrivate(string.format(
-      "/account/history?page=%d&maxItems=%d%s", page, HISTORY_PAGE_SIZE, range))
+      "/account/history?page=%d&maxItems=%d", page, HISTORY_PAGE_SIZE))
     if response == nil then
       error(describeError(err))
     end
@@ -644,25 +642,26 @@ local function fetchAccountHistory (since)
       end
     end
 
-    local totalPages = tonumber(response["totalPages"]) or 1
+    totalPages = tonumber(response["totalPages"]) or 1
     page = page + 1
   until page > totalPages or page > HISTORY_PAGE_LIMIT
+
+  if page > HISTORY_PAGE_LIMIT and page <= totalPages then
+    print(string.format(
+      "Bitvavo: Historie nach %d Seiten abgebrochen, %d wären nötig - ältere Vorgänge fehlen.",
+      HISTORY_PAGE_LIMIT, totalPages))
+  end
 
   return events
 end
 
 -- Turns the event list into MoneyMoney transactions for a cash account.
 --
--- Events at or before "since" are dropped, which is not the same cut as the fromDate handed to
--- the request: fromDate is inclusive, this is strict. The request narrows the range, this draws
--- the edge exactly.
---
--- MoneyMoney does deduplicate - a refresh returning bookings it already holds reports "0 are
--- new", verified live - so this filter is not what prevents duplicates. It is worth keeping
--- anyway: relying on undocumented behaviour for correctness is a trade this extension does not
--- need to make, and sending only what was asked for is cheaper on both sides. No overlap margin
--- for the same reason.
-local function buildCashTransactions (events, since)
+-- Every event is passed on, including those older than the point MoneyMoney asked for. It
+-- deduplicates on its own - a refresh returning bookings it already holds reports "0 are new",
+-- verified live - so sending more than was requested costs nothing but the transfer, and holding
+-- anything back would silently cap how far a user's history can reach.
+local function buildCashTransactions (events)
   local transactions = {}
 
   for _, event in pairs(events) do
@@ -682,24 +681,22 @@ local function buildCashTransactions (events, since)
           "https://github.com/GordonSeipold/MoneyMoney-Bitvavo/issues"))
       end
 
-      if since == nil or bookingDate > since then
-        local name, purpose = describeEvent(event)
+      local name, purpose = describeEvent(event)
 
-        transactions[#transactions + 1] = {
-          name = name,
-          amount = amount,
-          currency = "EUR",
-          bookingDate = bookingDate,
-          purpose = purpose,
-          -- Not transactionCode: MoneyMoney wants an integer there and rejects Bitvavo's UUID
-          -- with a warning per booking. It deduplicates without any help from us - a refresh
-          -- that returns two known bookings reports "0 are new" - but that match is on the
-          -- visible fields, so two identical amounts on one day would collapse into one. The
-          -- reference is what keeps them apart.
-          endToEndReference = tostring(event["transactionId"]),
-          booked = true
-        }
-      end
+      transactions[#transactions + 1] = {
+        name = name,
+        amount = amount,
+        currency = "EUR",
+        bookingDate = bookingDate,
+        purpose = purpose,
+        -- Not transactionCode: MoneyMoney wants an integer there and rejects Bitvavo's UUID with
+        -- a warning per booking. It deduplicates without any help from us - a refresh that
+        -- returns known bookings reports "0 are new" - but that match is on the visible fields,
+        -- so two identical amounts on one day would collapse into one. The reference keeps them
+        -- apart.
+        endToEndReference = tostring(event["transactionId"]),
+        booked = true
+      }
     end
   end
 
@@ -708,7 +705,10 @@ end
 
 -- The cash account: the EUR balance, and the events behind it. Not only the ones that moved
 -- euro - a coin transfer is booked at zero, see buildCashTransactions.
-local function refreshCashAccount (since)
+--
+-- The "since" MoneyMoney passes is deliberately unused: the whole history is delivered and
+-- MoneyMoney decides what of it to keep. See fetchAccountHistory.
+local function refreshCashAccount ()
   MM.printStatus(MM.localizeText("Fetching balances"))
   local balances = fetchBalances()
 
@@ -722,13 +722,13 @@ local function refreshCashAccount (since)
   MM.printStatus(MM.localizeText("Fetching transactions"))
   return {
     balance = balance,
-    transactions = buildCashTransactions(fetchAccountHistory(since), since)
+    transactions = buildCashTransactions(fetchAccountHistory())
   }
 end
 
 function RefreshAccount (account, since)
   if account["accountNumber"] == CASH_ACCOUNT then
-    return refreshCashAccount(since)
+    return refreshCashAccount()
   end
 
   MM.printStatus(MM.localizeText("Fetching balances"))

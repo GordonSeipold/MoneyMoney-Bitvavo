@@ -226,10 +226,12 @@ endpoints largely redundant.
 
 Parameters: `fromDate` and `toDate` (Unix milliseconds), `page`, `maxItems` (max 100), `type`.
 
-- **`fromDate` is what keeps a refresh cheap.** Without it every refresh pages through the whole
-  history, and the cost grows with the account's age: ten thousand events are a hundred requests,
-  every time. With it a refresh asks only for what happened since the last one. A first sync
-  still reads everything, once.
+- **`fromDate` is available and deliberately unused here.** MoneyMoney hands `RefreshAccount` a
+  `since` that would fit straight into it, and passing it on would make every refresh cheaper.
+  It would also decide, in the extension, how far a user's history reaches - a fresh setup was
+  observed asking for one year. This extension delivers everything the account has instead and
+  leaves that decision to MoneyMoney. The price is that a refresh pages the full history: a
+  hundred requests for ten thousand events, each costing one rate-limit point.
 - **Do not filter by `type`.** Its enumeration is the same fourteen documented types, and a live
   account was found to return a fifteenth. Filtering server side would drop such an event where
   nothing in the response could hint that anything was missing.
