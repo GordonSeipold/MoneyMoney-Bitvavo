@@ -4,8 +4,6 @@ Diese Web Banking Extension für [MoneyMoney](https://moneymoney.app) ruft Ihre 
 
 > Bitte beachten Sie: Weder Bitvavo noch MoneyMoney leisten für diese Extension Support oder sind an diesem Projekt beteiligt.
 
----
-
 ## Funktionsumfang
 
 - Listet jedes gehaltene Asset als Position, jeweils mit vollem Namen ("Bitcoin" statt "BTC")
@@ -33,14 +31,10 @@ Fixed Staking fällt heraus, weil diese Bestände für eine feste Frist gesperrt
 - **Nur aktuelle Bestände.** Ein- und Auszahlungen sowie Trades werden nicht importiert.
 - **Einige Assets sind bei Bitvavo vom Handel ausgeschlossen und haben keinen Kurs.** Solche Bestände werden mit ihrer Stückzahl, aber ohne Wert angezeigt – statt mit einem erfundenen Kurs. Das Protokollfenster von MoneyMoney (*Fenster → Protokoll*) nennt jedes betroffene Asset, sodass eine Position nie unbemerkt verschwindet. Welche Kryptowährungen handelbar sind, zeigt die [Marktübersicht von Bitvavo](https://bitvavo.com/de/markets).
 
----
-
 ## Voraussetzungen
 
 - [MoneyMoney für macOS](https://moneymoney.app). Getestet wurde mit Version 2.5.1 unter macOS 26.5.2; ältere Versionen sind ungetestet.
 - Ein [Bitvavo-Konto](https://bitvavo.com/de) mit einem API-Schlüssel, der **ausschließlich Leserechte** besitzt
-
----
 
 ## Einrichtung
 
@@ -86,20 +80,14 @@ Beim ersten Verbindungsaufbau fragt MoneyMoney nach der Bestätigung des SSL-Zer
 
 Schlägt die Anmeldung fehl, nennt die Extension den Grund im Klartext – etwa vertauschte Felder, ein unvollständiges Secret, eine fehlende Berechtigung oder eine IP-Adresse, die nicht auf der Whitelist des Schlüssels steht.
 
----
-
 ## Sicherheit
 
 - **Nur lesender Zugriff.** Die Extension stellt ausschließlich Leseanfragen. Sie erteilt niemals eine Order, bewegt keine Bestände und ändert keine Einstellung.
 - **Nichts geht an Dritte.** Die Extension spricht ausschließlich mit `api.bitvavo.com`. Ins Protokollfenster schreibt sie, wie viele Zeichen Sie in die beiden Felder eingetragen haben – nie deren Inhalt – sowie die Namen von Assets ohne Kurs. Das hilft bei der Fehlersuche und bleibt auf Ihrem Rechner.
 
----
-
 ## KI-Unterstützung
 
 Teile dieser Extension wurden mit KI-Unterstützung geschrieben oder überprüft. Der gesamte Code wurde vor der Veröffentlichung vom Autor geprüft und getestet.
-
----
 
 ## Lizenz
 
