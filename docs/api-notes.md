@@ -219,7 +219,7 @@ Two things the documentation does not say, both confirmed against a live account
 A locked amount is listed as its own position rather than added to the tradable one. The total
 would be right either way, but merging would hide that part of it cannot be sold.
 
-### `GET /v2/account/history` – private, not used **[verified – live, 2026-08-17]**
+### `GET /v2/account/history` – private **[verified – live, 2026-08-17]**
 
 Weight 1. Returns every account event in one paginated call, which makes the separate history
 endpoints largely redundant.
@@ -234,6 +234,10 @@ endpoints largely redundant.
 - Event types documented: `sell`, `buy`, `staking`, `fixed_staking`, `deposit`, `withdrawal`,
   `affiliate`, `distribution`, `internal_transfer`, `withdrawal_cancelled`, `rebate`, `loan`,
   `external_transferred_funds`, `manually_assigned`.
+- **The list is not exhaustive.** A live account returned `campaign_new_user_incentive`, which
+  appears in no Bitvavo documentation. Treat the documented set as a starting point: derive an
+  event's effect from its currency fields, not from a table of known types, or an unfamiliar one
+  will be dropped and the balance will be wrong with nothing looking wrong.
 - **Fields differ per type.** `transactionId`, `executedAt`, `type` and `address` are always
   present. A `buy` adds price, sent, received and fee fields; a `deposit` only received and fee;
   a `withdrawal` only sent and fee; a `rebate` only received, with **no fee fields at all**.
@@ -242,17 +246,26 @@ endpoints largely redundant.
   epoch. Two time formats in one API.
 - The event stream reconciles to `/v2/balance` exactly, to the cent, when every type is counted -
   including `rebate`, which is easy to overlook and was worth six cents on a nearly empty account.
-- `address` is masked here (`DE80***00`) but returned in full by `/v2/depositHistory`.
+- `address` names the other side of a transfer: a bank account for a fiat deposit, a wallet
+  address for a crypto withdrawal. It is `null` on everything that moves nothing in or out, a
+  trade included.
+- **The masking differs between endpoints.** This one shortens a bank account to `DE80***00`;
+  `/v2/depositHistory` returns the same field as a full IBAN. Prefer the masked value - it
+  identifies the account for whoever owns it without putting an IBAN somewhere it need not be.
+- Amounts come back with binary floating point artefacts (`0.00033875999999999996`). Format for
+  display; never compare for equality.
 
-Not used by this extension, which reports holdings only. Whether that should change is the
-subject of issue #2.
+This endpoint is the source for the cash account's transactions.
 
-### Possible later additions **[unconfirmed]**
+### `GET /v2/depositHistory` and `GET /v2/withdrawalHistory` – private, not used **[verified – live, 2026-08-17]**
 
-- `GET /v2/depositHistory` – params `symbol`, `limit`, `start`, `end`
-- `GET /v2/withdrawalHistory` – same params
+Params `symbol`, `limit`, `start`, `end`. Both readable with a `View access` key.
 
-Both read-only. Only relevant if transactions are wanted alongside holdings.
+Not used, because `/v2/account/history` already carries every event these return, and it does so
+in one call rather than two. They hold two fields it lacks - `status`, and a `txId` on a crypto
+withdrawal - neither of which a statement needs: an incomplete transfer has not moved the
+balance yet, and a blockchain transaction id is a detail for a block explorer, not a booking.
+`timestamp` here is milliseconds since epoch, where `/v2/account/history` uses ISO 8601.
 
 ## API key permissions **[verified – official docs]**
 

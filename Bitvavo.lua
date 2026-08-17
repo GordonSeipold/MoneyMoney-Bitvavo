@@ -447,13 +447,13 @@ local function formatNumber (value, currency)
   end
 
   if currency == "EUR" and math.abs(number) >= 0.005 then
-    return (string.format("%.2f", number):gsub("%%.", ","))
+    return (string.format("%.2f", number):gsub("%.", ","))
   end
 
   local text = string.format("%.8f", number)
   text = text:gsub("0+$", "")
-  text = text:gsub("%%.$", "")
-  return (text:gsub("%%.", ","))
+  text = text:gsub("%.$", "")
+  return (text:gsub("%.", ","))
 end
 
 -- Returns the two strings MoneyMoney shows for a booking: its name and its purpose line.
@@ -478,6 +478,24 @@ local function describeEvent (event)
     quantity = event["sentAmount"]
   end
 
+  -- Where the money came from or went to. Present on transfers, null on everything else.
+  --
+  -- Read from /account/history rather than from /depositHistory, which carries the same field
+  -- unmasked. Bitvavo shortens a bank account to "DE80***00" here, and that is the better
+  -- value: it names the source unambiguously for anyone who owns the account, and it keeps a
+  -- full IBAN out of MoneyMoney's database. The direction follows the currency fields, not the
+  -- event type, for the same reason the amount does - an unfamiliar transfer type still reads
+  -- correctly.
+  local address = event["address"]
+  local transfer = nil
+  if type(address) == "string" and address ~= "" then
+    if event["receivedCurrency"] ~= nil and event["sentCurrency"] == nil then
+      transfer = "Von " .. address
+    elseif event["sentCurrency"] ~= nil and event["receivedCurrency"] == nil then
+      transfer = "An " .. address
+    end
+  end
+
   if (eventType == "buy" or eventType == "sell") and asset ~= nil and asset ~= "EUR" then
     local traded = formatNumber(quantity, asset)
     local name = label .. " " .. (traded and (traded .. " ") or "") .. asset
@@ -497,7 +515,10 @@ local function describeEvent (event)
     return name, (#details > 0) and table.concat(details, ", ") or nil
   end
 
-  return label, known and tostring(eventType) or nil
+  -- A transfer says where it went; anything else falls back to Bitvavo's own type name, which
+  -- is what someone reconciling against a Bitvavo export looks for. An unknown type gets
+  -- neither, because the name already is that term.
+  return label, transfer or (known and tostring(eventType) or nil)
 end
 
 -- Fetches every page of /v2/account/history and returns the events as one flat list.
