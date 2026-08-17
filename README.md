@@ -49,7 +49,7 @@ Für eine feste Frist gesperrte Bestände werden bewusst nicht zur handelbaren P
 
 **Empfohlen: die signierte Fassung**
 
-1. Extension "Bestandsabfrage für Bitvavo.com" auf <https://moneymoney.app/extensions/> herunterladen.
+1. Extension "Bestandsabfrage für Bitvavo" auf <https://moneymoney.app/extensions/> herunterladen.
 2. *MoneyMoney → Hilfe → Zeige Datenbank im Finder*, die heruntergeladene Datei in den Ordner `Extensions` verschieben.
 3. MoneyMoney neu starten.
 
