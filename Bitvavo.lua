@@ -601,30 +601,37 @@ local function describeEvent (event)
   return label, (#details > 0) and table.concat(details, ", ") or nil
 end
 
--- Fetches the whole of /v2/account/history and returns the events as one flat list.
+-- Fetches /v2/account/history and returns the events as one flat list.
 --
--- Deliberately unrestricted. The endpoint takes fromDate and toDate, and MoneyMoney hands
--- RefreshAccount a "since" that would fit straight into fromDate - a fresh setup asked for one
--- year back. Passing it on would make every refresh cheaper and would also decide, here, how far
--- a user's history reaches. That is not this extension's decision to make: it delivers
--- everything the account has, and what MoneyMoney keeps or shows of it is MoneyMoney's business.
+-- The range is the one MoneyMoney asked for: its "since" goes into the endpoint's fromDate, so
+-- the server sends back the tail rather than the whole ledger. Nothing here decides how far a
+-- user's history reaches - MoneyMoney does, by choosing what to ask for, and it is the side that
+-- knows what it already holds.
 --
--- The price is that a refresh pages the full history rather than the tail of it, so its cost
--- grows with the age of the account: a hundred requests for ten thousand events, each costing
--- one of the thousand rate-limit points per minute.
+-- The alternative, ignoring the cut-off and returning everything on every refresh, was tried and
+-- discarded. It only helps if MoneyMoney keeps bookings it did not ask for, which is not
+-- established, and it pays for that unproven benefit on every single refresh: a hundred requests
+-- for ten thousand events, growing with the age of the account, where one request would do.
 --
--- Deliberately not narrowed by type either. The endpoint offers that filter and its enumeration
+-- Deliberately not narrowed by type, though. The endpoint offers that filter and its enumeration
 -- is the same fourteen types Bitvavo documents - which a live account was already found to
 -- exceed. A type filter would have dropped a real credit of 20 EUR at the server, where nothing
 -- in the response could hint that anything was missing.
-local function fetchAccountHistory ()
+local function fetchAccountHistory (since)
   local events = {}
   local page = 1
   local totalPages = 1
 
+  -- Milliseconds, and an integer: "%d", because Lua renders a float otherwise and Bitvavo
+  -- rejects it.
+  local range = ""
+  if since ~= nil then
+    range = string.format("&fromDate=%d", math.floor(since) * 1000)
+  end
+
   repeat
     local response, err = requestPrivate(string.format(
-      "/account/history?page=%d&maxItems=%d", page, HISTORY_PAGE_SIZE))
+      "/account/history?page=%d&maxItems=%d%s", page, HISTORY_PAGE_SIZE, range))
     if response == nil then
       error(describeError(err))
     end
@@ -657,10 +664,10 @@ end
 
 -- Turns the event list into MoneyMoney transactions for a cash account.
 --
--- Every event is passed on, including those older than the point MoneyMoney asked for. It
--- deduplicates on its own - a refresh returning bookings it already holds reports "0 are new",
--- verified live - so sending more than was requested costs nothing but the transfer, and holding
--- anything back would silently cap how far a user's history can reach.
+-- Everything the request returned is passed on, with no second cut-off here. The range was
+-- already drawn where it belongs, in the request, and MoneyMoney deduplicates on its own - a
+-- refresh returning bookings it already holds reports "0 are new", verified live - so the one
+-- event that can sit exactly on an inclusive boundary needs no guarding against.
 local function buildCashTransactions (events)
   local transactions = {}
 
@@ -706,9 +713,7 @@ end
 -- The cash account: the EUR balance, and the events behind it. Not only the ones that moved
 -- euro - a coin transfer is booked at zero, see buildCashTransactions.
 --
--- The "since" MoneyMoney passes is deliberately unused: the whole history is delivered and
--- MoneyMoney decides what of it to keep. See fetchAccountHistory.
-local function refreshCashAccount ()
+local function refreshCashAccount (since)
   MM.printStatus(MM.localizeText("Fetching balances"))
   local balances = fetchBalances()
 
@@ -722,13 +727,13 @@ local function refreshCashAccount ()
   MM.printStatus(MM.localizeText("Fetching transactions"))
   return {
     balance = balance,
-    transactions = buildCashTransactions(fetchAccountHistory())
+    transactions = buildCashTransactions(fetchAccountHistory(since))
   }
 end
 
 function RefreshAccount (account, since)
   if account["accountNumber"] == CASH_ACCOUNT then
-    return refreshCashAccount()
+    return refreshCashAccount(since)
   end
 
   MM.printStatus(MM.localizeText("Fetching balances"))

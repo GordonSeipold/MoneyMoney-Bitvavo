@@ -31,8 +31,6 @@ Der Kurs steht dort, weil er sich später aus nichts mehr rekonstruieren lässt,
 
 Ein Coin, der zwischen Bitvavo und einer Wallet wechselt, heißt **Übertragung** und nicht Auszahlung – Sie haben nichts entnommen, der Bestand ist nur in eine andere Verwahrung gewechselt. Wohin oder woher, steht in der Beschreibung. „Ein-" und „Auszahlung" bleiben dem vorbehalten, was tatsächlich als Geld zwischen Ihrem Bankkonto und Bitvavo fließt.
 
-Die Extension liefert **die vollständige Kontohistorie**, nicht nur einen Zeitraum. Wie viel davon MoneyMoney übernimmt und anzeigt, entscheidet MoneyMoney.
-
 **Auch Vorgänge, die kein EUR bewegen, werden gebucht** – etwa eine Übertragung an Ihre eigene Wallet. Sie erscheinen mit dem Betrag 0,00 EUR und ändern den Kontostand nicht. Ohne sie würden Coins eines Tages einfach nicht mehr im Depot stehen, ohne dass irgendwo steht, wohin sie gegangen sind.
 
 ### Welche Bestände enthalten sind
@@ -51,6 +49,7 @@ Für eine feste Frist gesperrte Bestände werden bewusst nicht zur handelbaren P
 
 ### Einschränkungen
 
+- **Wie weit die Umsätze zurückreichen, bestimmt MoneyMoney.** Es fordert bei jeder Aktualisierung einen Zeitraum an, und genau den liefert die Extension. Bei einer beobachteten Neueinrichtung waren das zwölf Monate.
 - **Das Depot zeigt keine Bewegungen.** MoneyMoney stellt bei einem Wertpapierdepot ausschließlich Bestände dar. Was mit einem Coin geschehen ist, steht deshalb im Verrechnungskonto.
 - **Tausch zwischen zwei Kryptowährungen erscheint nicht als eigene Buchung.** Ein solcher Vorgang bewegt zwei Coins gleichzeitig, und eine Buchung hat genau einen Betrag in genau einer Währung. Die Bestände im Depot stimmen danach trotzdem.
 - **Einige Assets sind bei Bitvavo vom Handel ausgeschlossen und haben keinen Kurs.** Solche Bestände werden mit ihrer Stückzahl, aber ohne Wert angezeigt – statt mit einem erfundenen Kurs. Das Protokollfenster von MoneyMoney (*Fenster → Protokoll*) nennt jedes betroffene Asset. Welche Kryptowährungen handelbar sind, zeigt die [Marktübersicht von Bitvavo](https://bitvavo.com/de/markets).

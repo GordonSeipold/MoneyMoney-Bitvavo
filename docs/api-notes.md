@@ -226,12 +226,12 @@ endpoints largely redundant.
 
 Parameters: `fromDate` and `toDate` (Unix milliseconds), `page`, `maxItems` (max 100), `type`.
 
-- **`fromDate` is available and deliberately unused here.** MoneyMoney hands `RefreshAccount` a
-  `since` that would fit straight into it, and passing it on would make every refresh cheaper.
-  It would also decide, in the extension, how far a user's history reaches - a fresh setup was
-  observed asking for one year. This extension delivers everything the account has instead and
-  leaves that decision to MoneyMoney. The price is that a refresh pages the full history: a
-  hundred requests for ten thousand events, each costing one rate-limit point.
+- **`fromDate` takes the `since` MoneyMoney hands to `RefreshAccount`**, so a refresh asks for the
+  tail of the ledger rather than all of it. Without it the cost grows with the age of the
+  account: ten thousand events are a hundred requests, on every refresh, where one would do.
+  How far a user's history reaches is then MoneyMoney's decision, made by what it asks for - a
+  fresh setup was observed asking for twelve months. Returning more than that only helps if
+  MoneyMoney keeps what it did not request, which is not established.
 - **Do not filter by `type`.** Its enumeration is the same fourteen documented types, and a live
   account was found to return a fifteenth. Filtering server side would drop such an event where
   nothing in the response could hint that anything was missing.
