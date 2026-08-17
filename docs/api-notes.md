@@ -6,10 +6,21 @@ independent official SDKs, **[unconfirmed]** otherwise. Do not treat unconfirmed
 ## Base
 
 - REST base: `https://api.bitvavo.com/v2` **[verified – live]**
+- Docs: <https://docs.bitvavo.com/docs/rest-api/introduction/>
+- **OpenAPI specification: <https://docs.bitvavo.com/api-specs/exchange-rest-api.yaml>** - the
+  authoritative description of every response, machine-readable, with an example per field.
+  Prefer it over the SDKs: the Python wrapper has no `stakingBalance` method, which once led to
+  the wrong conclusion that the endpoint did not exist.
 - Official SDKs: <https://github.com/bitvavo/php-bitvavo-api>,
   <https://github.com/bitvavo/python-bitvavo-api>
-- Docs: <https://docs.bitvavo.com/docs/rest-api/introduction/>
-  (the help centre is behind Cloudflare and cannot be fetched programmatically)
+
+**There is no test environment.** The specification lists a single server,
+`https://api.bitvavo.com/v2`, and the documentation contains no mention of a sandbox, testnet or
+demo account. The official Postman collection needs your own key and secret. Every call is
+against a real account, which is why the offline simulation exists.
+
+The help centre is behind Cloudflare and cannot be fetched programmatically; a browser reaches
+it.
 
 ## Authentication **[verified – PHP and Python SDKs agree]**
 
@@ -133,6 +144,11 @@ fields per entry, exactly as both SDKs document.
 - 440 markets in one call. **All prices for the whole portfolio cost a single request.**
 - Quote currencies: **429 EUR, 11 USDC**, nothing else.
 - `price` is a **string** – always `tonumber()`.
+
+> The specification's example for this field reads `'34,243'`, with a comma. Live responses use
+> a plain decimal point (`"54821"`), so the example is a documentation error. Worth knowing what
+> the extension would do if it were not: `tonumber` returns `nil` for such a string and the asset
+> is listed unpriced, rather than silently valued at 34.
 
 **No asset is priced only in USDC [verified – live, 2026-08-16].** All eleven USDC markets –
 `ADA`, `BTC`, `DOGE`, `ETH`, `EURC`, `PEPE`, `SOL`, `SUI`, `TIA`, `USDCV` and `XRP` against
