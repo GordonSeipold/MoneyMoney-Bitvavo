@@ -25,9 +25,11 @@ Jede Buchung nennt im Titel die Art des Vorgangs und in der Beschreibung die Ein
 |---|---|
 | `Kauf BTC` | `0,00456086 BTC (Kurs 54.676,00 EUR, Gebühr 0,63 EUR)` |
 | `Einzahlung` | `Von DE80***00` – Ihre Bankverbindung, wie Bitvavo sie verkürzt zurückgibt |
-| `Auszahlung BTC` | `0,00033876 BTC (An bc1q…, Gebühr 0,000023 BTC)` |
+| `Übertragung BTC` | `0,00033876 BTC (An bc1q…, Gebühr 0,000023 BTC)` |
 
 Der Kurs steht dort, weil er sich später aus nichts mehr rekonstruieren lässt, sobald der Markt weitergelaufen ist.
+
+Ein Coin, der zwischen Bitvavo und einer Wallet wechselt, heißt **Übertragung** und nicht Auszahlung – Sie haben nichts entnommen, der Bestand ist nur in eine andere Verwahrung gewechselt. Wohin oder woher, steht in der Beschreibung. „Ein-" und „Auszahlung" bleiben dem vorbehalten, was tatsächlich als Geld zwischen Ihrem Bankkonto und Bitvavo fließt.
 
 **Auch Vorgänge, die kein EUR bewegen, werden gebucht** – etwa eine Übertragung an Ihre eigene Wallet. Sie erscheinen mit dem Betrag 0,00 EUR und ändern den Kontostand nicht. Ohne sie würden Coins eines Tages einfach nicht mehr im Depot stehen, ohne dass irgendwo steht, wohin sie gegangen sind.
 

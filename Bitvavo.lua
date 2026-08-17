@@ -44,7 +44,7 @@ local ASSET_NAME_TTL = 7 * 24 * 60 * 60
 WebBanking{
   -- MAJOR.NN, two decimals - the resolution MoneyMoney prints in the protocol window. 1.00 is
   -- the first published release; every change after it increments the last position.
-  version  = 1.08,
+  version  = 1.10,
   url      = "https://bitvavo.com",
   services = { BANK_CODE },
   -- Observed on the account dialog: MoneyMoney displays none of this, and offers no way to
@@ -505,10 +505,22 @@ end
 -- Everything else carries Bitvavo's own type in the purpose, which is what someone comparing
 -- this against a Bitvavo export needs. The exception is a type this extension does not know:
 -- there the name already is that term, so repeating it would only fill the column twice.
+-- Bitvavo calls both of these "withdrawal": euro sent to a bank account, and a coin sent to a
+-- wallet the customer controls. They are not the same event. The first leaves the relationship;
+-- the second moves the same holding into the customer's own custody, and nothing was spent.
+-- Labelling both "Auszahlung" reads as if the coins had been cashed out.
+--
+-- "Übertragung" says what happened without implying either. The direction is not in the word
+-- because it does not need to be: the purpose line names the other side as "An ..." or
+-- "Von ...", and one label for both directions is what lets a statement group them.
+local ASSET_EVENT_LABEL = {
+  deposit    = "Übertragung",
+  withdrawal = "Übertragung"
+}
+
 local function describeEvent (event)
   local eventType = event["type"]
-  local known = EVENT_LABEL[eventType]
-  local label = known or humaniseType(eventType)
+  local label = EVENT_LABEL[eventType] or humaniseType(eventType)
 
   -- On a buy the asset arrives and EUR leaves; on a sell, and on a transfer out, the reverse.
   local asset = movedAsset(event)
@@ -564,6 +576,9 @@ local function describeEvent (event)
   end
 
   if asset ~= nil then
+    -- asset is never EUR here, so a transfer label applies whenever one exists for the type.
+    label = ASSET_EVENT_LABEL[eventType] or label
+
     local moved = formatNumber(quantity, asset)
     local name = label .. " " .. asset
     local head = moved and (moved .. " " .. asset) or nil
@@ -679,7 +694,12 @@ local function buildCashTransactions (events, since)
           currency = "EUR",
           bookingDate = bookingDate,
           purpose = purpose,
-          transactionCode = tostring(event["transactionId"]),
+          -- Not transactionCode: MoneyMoney wants an integer there and rejects Bitvavo's UUID
+          -- with a warning per booking. It deduplicates without any help from us - a refresh
+          -- that returns two known bookings reports "0 are new" - but that match is on the
+          -- visible fields, so two identical amounts on one day would collapse into one. The
+          -- reference is what keeps them apart.
+          endToEndReference = tostring(event["transactionId"]),
           booked = true
         }
       end
